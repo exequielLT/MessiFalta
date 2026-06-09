@@ -1,133 +1,108 @@
 import React from 'react';
-import { 
-  StyleSheet, 
-  Pressable, 
-  ActivityIndicator, 
-  View,
-  type ViewStyle,
-  type TextStyle
+import {
+  TouchableOpacity,
+  Text,
+  ActivityIndicator,
+  StyleSheet,
+  StyleProp,
+  ViewStyle,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { ThemedText } from './themed-text';
-import { useTheme } from '@/hooks/use-theme';
-import { Spacing } from '@/constants/theme';
+import { colors, borderRadius, sizes, spacing, fontSizes } from '../constants/theme';
 
-export interface ButtonProps {
+interface ButtonProps {
   title: string;
   onPress: () => void;
   variant?: 'primary' | 'secondary' | 'danger';
   loading?: boolean;
   disabled?: boolean;
-  icon?: keyof typeof Ionicons.glyphMap;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
 }
 
-export default function Button({
+export const Button: React.FC<ButtonProps> = ({
   title,
   onPress,
   variant = 'primary',
   loading = false,
   disabled = false,
-  icon,
   style,
-}: ButtonProps) {
-  const theme = useTheme();
+}) => {
+  const isSecondary = variant === 'secondary';
 
-  // Determine colors based on variant
-  const getColors = () => {
-    switch (variant) {
-      case 'secondary':
-        return {
-          background: theme.surfaceContainerHighest,
-          text: theme.onSurface,
-          loader: theme.onSurface,
-        };
-      case 'danger':
-        return {
-          background: theme.error,
-          text: theme.onError,
-          loader: theme.onError,
-        };
-      case 'primary':
-      default:
-        return {
-          background: theme.primary,
-          text: theme.onPrimary,
-          loader: theme.onPrimary,
-        };
-    }
-  };
+  let containerStyle: StyleProp<ViewStyle> = [styles.container];
+  let textStyle = [styles.text];
 
-  const colors = getColors();
-  const isDisabled = disabled || loading;
+  if (variant === 'primary') {
+    containerStyle.push(styles.primaryContainer);
+    textStyle.push(styles.primaryText);
+  } else if (variant === 'secondary') {
+    containerStyle.push(styles.secondaryContainer);
+    textStyle.push(styles.secondaryText);
+  } else if (variant === 'danger') {
+    containerStyle.push(styles.dangerContainer);
+    textStyle.push(styles.dangerText);
+  }
+
+  if (disabled || loading) {
+    containerStyle.push(styles.disabled);
+  }
 
   return (
-    <Pressable
+    <TouchableOpacity
+      style={[containerStyle, style]}
       onPress={onPress}
-      disabled={isDisabled}
-      style={({ pressed }) => [
-        styles.button,
-        {
-          backgroundColor: colors.background,
-          borderColor: theme.outlineVariant + '33',
-        },
-        isDisabled && styles.disabled,
-        pressed && !isDisabled && styles.pressed,
-        style,
-      ]}
-      accessibilityRole="button"
-      accessibilityState={{ disabled: isDisabled, busy: loading }}
+      disabled={disabled || loading}
+      activeOpacity={0.8}
     >
       {loading ? (
-        <ActivityIndicator size="small" color={colors.loader} />
+        <>
+          <ActivityIndicator
+            color={isSecondary ? colors.primary : '#FFFFFF'}
+            style={styles.loader}
+          />
+          <Text style={textStyle}>Cargando...</Text>
+        </>
       ) : (
-        <View style={styles.contentContainer}>
-          {icon && (
-            <Ionicons 
-              name={icon} 
-              size={18} 
-              color={colors.text} 
-              style={styles.icon} 
-            />
-          )}
-          <ThemedText 
-            style={[styles.text, { color: colors.text }]} 
-            type="labelMd"
-          >
-            {title}
-          </ThemedText>
-        </View>
+        <Text style={textStyle}>{title}</Text>
       )}
-    </Pressable>
+    </TouchableOpacity>
   );
-}
+};
 
 const styles = StyleSheet.create({
-  button: {
-    height: 48,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.four,
-    borderWidth: 1,
-    borderCurve: 'continuous',
-    boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.05)',
-  },
-  contentContainer: {
+  container: {
+    height: sizes.buttonHeight,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.lg,
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-  },
-  icon: {
-    marginRight: Spacing.two,
+    justifyContent: 'center',
   },
   text: {
-    fontWeight: '700',
-    textAlign: 'center',
+    fontSize: fontSizes.body,
+    fontWeight: '600',
   },
-  pressed: {
-    opacity: 0.9,
-    transform: [{ scale: 0.97 }],
+  loader: {
+    marginRight: spacing.sm,
+  },
+  primaryContainer: {
+    backgroundColor: colors.primary,
+  },
+  primaryText: {
+    color: '#FFFFFF',
+  },
+  secondaryContainer: {
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderColor: colors.primary,
+  },
+  secondaryText: {
+    color: colors.primary,
+  },
+  dangerContainer: {
+    backgroundColor: colors.error,
+  },
+  dangerText: {
+    color: '#FFFFFF',
   },
   disabled: {
     opacity: 0.5,
