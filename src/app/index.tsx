@@ -5,15 +5,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useTheme } from '@/hooks/use-theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useThemeContext } from '@/context/theme-context';
 import { Spacing } from '@/constants/theme';
+import AppHeader from '@/components/AppHeader';
 
 export default function HomeScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  const { toggleTheme } = useThemeContext();
 
   // Mock data for the MVP dashboard
   const totalFiguritas = 400;
@@ -25,50 +22,7 @@ export default function HomeScreen() {
 
   return (
     <ThemedView style={styles.rootContainer}>
-      {/* Top Header Bar */}
-      <View style={[styles.headerContainer, { borderColor: theme.outlineVariant + '33' }]}>
-        <View style={styles.headerInner}>
-          <View style={styles.logoContainer}>
-            <Ionicons name="football" size={26} color={theme.primary} />
-            <ThemedText type="headlineSm" style={styles.logoText}>
-              FiguMatch
-            </ThemedText>
-          </View>
-
-          <View style={styles.headerActions}>
-            {/* Theme Toggle Button */}
-            <Pressable 
-              onPress={toggleTheme}
-              style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
-              accessibilityLabel="Alternar modo de color"
-              accessibilityRole="button"
-            >
-              <Ionicons 
-                name={colorScheme === 'dark' ? 'sunny' : 'moon-outline'} 
-                size={22} 
-                color={theme.onSurface} 
-              />
-            </Pressable>
-
-            {/* Notifications Button */}
-            <Pressable 
-              onPress={() => router.push('/matches')}
-              style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
-              accessibilityLabel="Ver notificaciones de matches"
-              accessibilityRole="button"
-            >
-              <Ionicons name="notifications-outline" size={24} color={theme.onSurface} />
-              {pendingMatches > 0 && (
-                <View style={[styles.badge, { backgroundColor: theme.error }]}>
-                  <ThemedText style={styles.badgeText} type="labelSm">
-                    {pendingMatches}
-                  </ThemedText>
-                </View>
-              )}
-            </Pressable>
-          </View>
-        </View>
-      </View>
+      <AppHeader pendingNotificationsCount={pendingMatches} />
 
       <ScrollView 
         contentInsetAdjustmentBehavior="automatic"
@@ -252,58 +206,6 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   rootContainer: {
     flex: 1,
-  },
-  headerContainer: {
-    width: '100%',
-    borderBottomWidth: 1,
-    backgroundColor: 'transparent',
-  },
-  headerInner: {
-    height: 56,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.three,
-    maxWidth: 500,
-    width: '100%',
-    alignSelf: 'center',
-  },
-  logoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-  },
-  logoText: {
-    fontWeight: '800',
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.one,
-  },
-  iconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  badge: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 3,
-  },
-  badgeText: {
-    color: '#ffffff',
-    fontSize: 9,
-    fontWeight: 'bold',
   },
   scrollContainer: {
     padding: Spacing.three,
