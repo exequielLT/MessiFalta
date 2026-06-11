@@ -16,7 +16,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import Button from '@/components/Button';
+import { Button } from '@/components/Button';
 import AppHeader from '@/components/AppHeader';
 
 // Temporary local database storage key (to be replaced with db integration later)
@@ -208,7 +208,6 @@ export default function PerfilScreen() {
             title="Compartir" 
             onPress={handleShareProfile} 
             variant="secondary" 
-            icon="share-social-outline"
             style={styles.actionButton}
           />
         </View>

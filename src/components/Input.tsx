@@ -43,7 +43,7 @@ export const Input: React.FC<InputProps> = ({
         style={[
           styles.inputContainer,
           hasError && styles.inputContainerError,
-          style,
+          style as any,
         ]}
       >
         <TextInput
