@@ -1,15 +1,14 @@
 import React from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, StyleProp, ViewStyle } from 'react-native';
-import { colors, spacing, fontSizes, borderRadius } from '../constants/theme';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { colors } from '../constants/theme';
 import { Button } from './Button';
 
-export interface StatusScreenProps {
+interface StatusScreenProps {
   type: 'loading' | 'empty' | 'error';
   title: string;
   description?: string;
   actionLabel?: string;
   onAction?: () => void;
-  style?: StyleProp<ViewStyle>;
 }
 
 export const StatusScreen: React.FC<StatusScreenProps> = ({
@@ -18,51 +17,34 @@ export const StatusScreen: React.FC<StatusScreenProps> = ({
   description,
   actionLabel,
   onAction,
-  style,
 }) => {
-  const renderIcon = () => {
-    if (type === 'loading') {
-      return (
-        <ActivityIndicator
-          size="large"
-          color={colors.primary}
-          style={styles.loadingIcon}
-        />
-      );
-    }
-    
-    if (type === 'empty') {
-      return <View style={styles.emptyIconPlaceholder} />;
-    }
-    
-    if (type === 'error') {
-      return (
-        <View style={styles.errorIconContainer}>
-          <Text style={styles.errorIconText}>×</Text>
-        </View>
-      );
-    }
-    
-    return null;
-  };
-
-  const isActionable = !!actionLabel && !!onAction;
-
   return (
-    <View style={[styles.container, style]}>
-      {renderIcon()}
-      
-      <Text style={[styles.title, type === 'loading' && styles.titleLoading]}>
-        {title}
-      </Text>
-      
-      {description && type !== 'loading' && (
-        <Text style={styles.description}>{description}</Text>
+    <View style={styles.container}>
+      {type === 'loading' && (
+        <ActivityIndicator size="large" color={colors.primary} style={styles.loadingIndicator} />
       )}
+
+      {type === 'empty' && (
+        <View style={styles.emptyPlaceholder} />
+      )}
+
+      {type === 'error' && (
+        <View style={styles.errorCircle}>
+          <Text style={styles.errorCross}>X</Text>
+        </View>
+      )}
+
+      <Text style={[styles.title, type === 'loading' && styles.titleLoading]}>{title}</Text>
       
-      {isActionable && type !== 'loading' && (
+      {description && <Text style={styles.description}>{description}</Text>}
+
+      {actionLabel && onAction && (
         <View style={styles.buttonContainer}>
-          <Button title={actionLabel} onPress={onAction} variant="primary" />
+          <Button
+            title={actionLabel}
+            onPress={onAction}
+            variant="primary"
+          />
         </View>
       )}
     </View>
@@ -74,55 +56,52 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: spacing.lg,
-    backgroundColor: colors.background,
+    padding: 24,
+    backgroundColor: '#FFFFFF',
   },
-  loadingIcon: {
-    marginBottom: spacing.md,
+  loadingIndicator: {
+    marginBottom: 16,
   },
-  emptyIconPlaceholder: {
+  emptyPlaceholder: {
     width: 120,
     height: 120,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    marginBottom: spacing.lg,
+    backgroundColor: colors.border,
+    borderRadius: 8,
+    marginBottom: 24,
   },
-  errorIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+  errorCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: colors.error,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: 24,
   },
-  errorIconText: {
-    fontSize: 54,
+  errorCross: {
     color: '#FFFFFF',
-    fontWeight: '300',
-    marginTop: -6, // Optical centering adjustment
+    fontSize: 24,
+    fontWeight: 'bold',
   },
   title: {
-    fontSize: fontSizes.h2,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '600',
     color: colors.textPrimary,
     textAlign: 'center',
-    marginBottom: spacing.sm,
+    marginBottom: 8,
   },
   titleLoading: {
-    fontSize: fontSizes.body,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: 'normal',
   },
   description: {
-    fontSize: fontSizes.body,
+    fontSize: 16,
     color: colors.textSecondary,
     textAlign: 'center',
-    marginBottom: spacing.lg,
-    paddingHorizontal: spacing.md,
+    marginBottom: 24,
   },
   buttonContainer: {
-    marginTop: spacing.sm,
     width: '100%',
-    maxWidth: 320,
+    marginTop: 8,
   },
 });

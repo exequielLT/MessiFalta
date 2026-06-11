@@ -1,25 +1,20 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ViewStyle, StyleProp, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { colors } from '../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 
-export interface FiguritaInfo {
-  number: number | string;
+interface FiguritaInfo {
+  number: number;
   name?: string;
 }
 
-export interface CardMatchProps {
+interface CardMatchProps {
   userName: string;
   reputation: number;
   offeredFigurita: FiguritaInfo;
   requestedFigurita: FiguritaInfo;
   distance?: string;
   onPress?: () => void;
-  style?: StyleProp<ViewStyle>;
-  avatarUrl?: string;
-  tradesCount?: number;
 }
 
 export const CardMatch: React.FC<CardMatchProps> = ({
@@ -29,114 +24,56 @@ export const CardMatch: React.FC<CardMatchProps> = ({
   requestedFigurita,
   distance,
   onPress,
-  style,
-  avatarUrl,
-  tradesCount,
 }) => {
-  const theme = useTheme();
-  const scheme = useColorScheme();
-
-  const offersBg = scheme === 'dark' ? 'rgba(83, 225, 111, 0.15)' : 'rgba(52, 199, 89, 0.1)';
-  const offersText = scheme === 'dark' ? '#53e16f' : '#34C759';
-  const seeksBg = scheme === 'dark' ? 'rgba(255, 184, 116, 0.15)' : 'rgba(255, 149, 0, 0.1)';
-  const seeksText = scheme === 'dark' ? '#ffb874' : '#FF9500';
-
   const renderStars = () => {
     const stars = [];
-    const maxStars = 5;
-    for (let i = 0; i < maxStars; i++) {
+    for (let i = 1; i <= 5; i++) {
       stars.push(
-        <Text
-          key={i}
-          style={[
-            styles.star,
-            { color: i < reputation ? colors.warning : '#C7C7CC' },
-          ]}
-        >
-          ★
+        <Text key={i} style={{ color: i <= reputation ? colors.primary : colors.border, fontSize: 14 }}>
+          {i <= reputation ? '★' : '☆'}
         </Text>
       );
     }
     return <View style={styles.starsContainer}>{stars}</View>;
   };
 
-  const renderFiguritaInfo = (label: string, figurita: FiguritaInfo, tagColor: string, tagTextColor: string, tagBgColor: string) => {
-    const text = figurita.name
-      ? `Nº ${figurita.number} - ${figurita.name}`
-      : `Nº ${figurita.number}`;
-      
-    return (
-      <View style={styles.figuritaRow}>
-        <View style={[styles.tag, { backgroundColor: tagBgColor }]}>
-          <Text style={[styles.tagText, { color: tagTextColor }]}>{label}</Text>
-        </View>
-        <Text style={[styles.figuritaText, { color: theme.onSurface }]} numberOfLines={1}>
-          {text}
-        </Text>
-      </View>
-    );
-  };
-
   const content = (
-    <View style={[
-      styles.container, 
-      { 
-        backgroundColor: theme.surfaceContainerLowest, 
-        borderColor: theme.outlineVariant 
-      }, 
-      style
-    ]}>
-      <View style={styles.headerRow}>
-        <View style={styles.userProfileContainer}>
-          {avatarUrl ? (
-            <Image source={{ uri: avatarUrl }} style={styles.avatar} />
-          ) : (
-            <View style={[styles.avatar, styles.defaultAvatar, { backgroundColor: theme.surfaceContainerHigh }]}>
-              <Text style={[styles.defaultAvatarText, { color: theme.primary }]}>
-                {userName.charAt(0).toUpperCase()}
-              </Text>
-            </View>
-          )}
-          <View style={styles.userInfo}>
-            <Text style={[styles.userName, { color: theme.onSurface }]} numberOfLines={1}>
-              {userName}
+    <View style={styles.container}>
+      <View style={styles.contentContainer}>
+        <View style={styles.headerRow}>
+          <Text style={styles.userName}>{userName}</Text>
+          {renderStars()}
+        </View>
+
+        <View style={styles.tradeRow}>
+          <Text style={styles.tradeLabel}>Ofrece: </Text>
+          <View style={[styles.tag, { backgroundColor: colors.secondary + '20' }]}>
+            <Text style={[styles.tagText, { color: colors.secondary }]}>
+              Nº {offeredFigurita.number}{offeredFigurita.name ? ` - ${offeredFigurita.name}` : ''}
             </Text>
-            <View style={styles.ratingSubRow}>
-              {renderStars()}
-              {tradesCount !== undefined && (
-                <Text style={[styles.tradesCountText, { color: theme.onSurfaceVariant }]}>
-                  ({tradesCount} canjes)
-                </Text>
-              )}
-            </View>
           </View>
         </View>
-        {onPress && (
-          <Ionicons name="chevron-forward" size={20} color={theme.outline} />
+
+        <View style={styles.tradeRow}>
+          <Text style={styles.tradeLabel}>Busca: </Text>
+          <View style={[styles.tag, { backgroundColor: colors.warning + '20' }]}>
+            <Text style={[styles.tagText, { color: colors.warning }]}>
+              Nº {requestedFigurita.number}{requestedFigurita.name ? ` - ${requestedFigurita.name}` : ''}
+            </Text>
+          </View>
+        </View>
+
+        {distance && (
+          <View style={styles.distanceRow}>
+            <Ionicons name="location-outline" size={14} color={colors.textSecondary} />
+            <Text style={styles.distanceText}>{distance}</Text>
+          </View>
         )}
       </View>
 
-      <View style={styles.detailsContainer}>
-        {renderFiguritaInfo(
-          'Ofrece',
-          offeredFigurita,
-          theme.secondary,
-          offersText,
-          offersBg
-        )}
-        {renderFiguritaInfo(
-          'Busca',
-          requestedFigurita,
-          theme.tertiary,
-          seeksText,
-          seeksBg
-        )}
-      </View>
-
-      {distance && (
-        <View style={styles.distanceContainer}>
-          <Ionicons name="location-sharp" size={14} color={theme.onSurfaceVariant} style={styles.distanceIcon} />
-          <Text style={[styles.distanceText, { color: theme.onSurfaceVariant }]}>{distance}</Text>
+      {onPress && (
+        <View style={styles.chevronContainer}>
+          <Ionicons name="chevron-forward" size={24} color={colors.border} />
         </View>
       )}
     </View>
@@ -155,102 +92,64 @@ export const CardMatch: React.FC<CardMatchProps> = ({
 
 const styles = StyleSheet.create({
   container: {
+    flexDirection: 'row',
     borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: 12,
-    padding: spacing.md,
-    // iOS shadow matching the .ios-shadow class
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    elevation: 2,
+    padding: 16,
+    backgroundColor: '#FFFFFF',
+    marginBottom: 8,
+  },
+  contentContainer: {
+    flex: 1,
   },
   headerRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  userProfileContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 12,
-  },
-  defaultAvatar: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  defaultAvatarText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  userInfo: {
-    flex: 1,
-    justifyContent: 'center',
+    marginBottom: 12,
   },
   userName: {
     fontSize: 16,
     fontWeight: '600',
-  },
-  ratingSubRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 2,
+    color: colors.textPrimary,
+    marginRight: 8,
   },
   starsContainer: {
     flexDirection: 'row',
   },
-  star: {
-    fontSize: 12,
-    marginHorizontal: 0.5,
-  },
-  tradesCountText: {
-    fontSize: 13,
-    marginLeft: 4,
-  },
-  detailsContainer: {
-    gap: spacing.sm,
-    marginBottom: spacing.sm,
-  },
-  figuritaRow: {
+  tradeRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 8,
+    flexWrap: 'wrap',
+  },
+  tradeLabel: {
+    fontSize: 14,
+    color: colors.textPrimary,
+    marginRight: 4,
   },
   tag: {
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 4,
-    marginRight: spacing.sm,
-    minWidth: 56,
-    alignItems: 'center',
   },
   tagText: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontSize: 12,
+    fontWeight: '600',
   },
-  figuritaText: {
-    fontSize: 15,
-    fontWeight: '500',
-    flex: 1,
-  },
-  distanceContainer: {
+  distanceRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: spacing.sm,
-  },
-  distanceIcon: {
-    marginRight: 4,
+    marginTop: 4,
   },
   distanceText: {
     fontSize: 14,
-    fontWeight: '500',
+    color: colors.textSecondary,
+    marginLeft: 4,
+  },
+  chevronContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
   },
 });
