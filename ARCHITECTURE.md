@@ -38,4 +38,4 @@ FiguMatch sigue una arquitectura **cliente-servidor** con un frontend móvil des
 - **Supabase:** Unifica autenticación, base de datos relacional y almacenamiento, simplificando la infraestructura.
 - **CodeScreen como modal raíz:** Evita que esta pantalla contamine el stack de navegación de la pestaña Matches, resolviendo un problema de flujo detectado con teoría de grafos.
 - **Mapeo local + API externa:** Reduce la dependencia de la API para datos estáticos (selección, dorsal) y la usa solo para nombre oficial y foto.
-- **Componentes atómicos reutilizables:** Garantizan coherencia visual y facilitan el desarrollo paralelo por tres integrantes sin conflictos.
+- **Componentes atómicos reutilizables:** Garantizan coherencia visual y facilitan el desarrollo paralelo por tres integrantes sin conflictos .
