@@ -157,7 +157,11 @@ const styles = StyleSheet.create({
   
   // Background atmospheres matching designs with cross-platform shadow/blurs
   slide1Gradient: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
     backgroundColor: 'rgba(0, 122, 255, 0.04)',
     height: '35%',
     pointerEvents: 'none',

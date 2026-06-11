@@ -7,7 +7,8 @@ import {
   StyleProp,
   ViewStyle,
 } from 'react-native';
-import { colors, borderRadius, sizes, spacing, fontSizes } from '../constants/theme';
+import { borderRadius, sizes, spacing, fontSizes } from '../constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
 interface ButtonProps {
   title: string;
@@ -26,20 +27,25 @@ export const Button: React.FC<ButtonProps> = ({
   disabled = false,
   style,
 }) => {
+  const theme = useTheme();
   const isSecondary = variant === 'secondary';
 
   let containerStyle: StyleProp<ViewStyle> = [styles.container];
-  let textStyle = [styles.text];
+  let textStyle: any[] = [styles.text];
 
   if (variant === 'primary') {
-    containerStyle.push(styles.primaryContainer);
-    textStyle.push(styles.primaryText);
+    containerStyle.push({ backgroundColor: theme.primary });
+    textStyle.push({ color: theme.onPrimary });
   } else if (variant === 'secondary') {
-    containerStyle.push(styles.secondaryContainer);
-    textStyle.push(styles.secondaryText);
+    containerStyle.push({
+      backgroundColor: 'transparent',
+      borderWidth: 2,
+      borderColor: theme.primary,
+    });
+    textStyle.push({ color: theme.primary });
   } else if (variant === 'danger') {
-    containerStyle.push(styles.dangerContainer);
-    textStyle.push(styles.dangerText);
+    containerStyle.push({ backgroundColor: theme.error });
+    textStyle.push({ color: theme.onError });
   }
 
   if (disabled || loading) {
@@ -56,7 +62,7 @@ export const Button: React.FC<ButtonProps> = ({
       {loading ? (
         <>
           <ActivityIndicator
-            color={isSecondary ? colors.primary : '#FFFFFF'}
+            color={isSecondary ? theme.primary : theme.onPrimary}
             style={styles.loader}
           />
           <Text style={textStyle}>Cargando...</Text>
@@ -83,26 +89,6 @@ const styles = StyleSheet.create({
   },
   loader: {
     marginRight: spacing.sm,
-  },
-  primaryContainer: {
-    backgroundColor: colors.primary,
-  },
-  primaryText: {
-    color: '#FFFFFF',
-  },
-  secondaryContainer: {
-    backgroundColor: 'transparent',
-    borderWidth: 2,
-    borderColor: colors.primary,
-  },
-  secondaryText: {
-    color: colors.primary,
-  },
-  dangerContainer: {
-    backgroundColor: colors.error,
-  },
-  dangerText: {
-    color: '#FFFFFF',
   },
   disabled: {
     opacity: 0.5,
