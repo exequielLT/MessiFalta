@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,291 +7,351 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  SafeAreaView
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
-import { colors, spacing, borderRadius, fontSizes } from '../constants/theme';
-// @ts-ignore - Assuming useAuth is exported from AuthContext
-import { useAuth } from '../context/AuthContext';
-// @ts-ignore - Assuming addFigurita is exported from figuritasService
-import { addFigurita } from '../services/figuritasService';
-// @ts-ignore - Assuming searchPlayer is exported from api
+import { colors } from '../constants/theme';
+import { supabase } from '../services/supabase';
 import { searchPlayer } from '../services/api';
-// @ts-ignore - Assuming playerMapping is an object exported from playerMapping
+import { uploadPlayerImage } from '../services/storageService';
 import { playerMapping } from '../constants/playerMapping';
+import { useAuth } from '../context/AuthContext';
 
-export const AddFiguritaScreen = () => {
+export const AddFiguritaScreen: React.FC = () => {
   const navigation = useNavigation();
-  const { user } = useAuth();
+  const { user } = useAuth() as any;
 
   const [numero, setNumero] = useState('');
   const [nombre, setNombre] = useState('');
   const [tipo, setTipo] = useState<'repetida' | 'faltante' | null>(null);
   
   const [saving, setSaving] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-  
   const [searching, setSearching] = useState(false);
+  
+  const [errorMessage, setErrorMessage] = useState('');
   const [apiError, setApiError] = useState('');
+  
+  const [userEditedName, setUserEditedName] = useState(false);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [showCheck, setShowCheck] = useState(false);
 
-  const handleSearchPlayer = async (numToSearch: string) => {
-    const numInt = parseInt(numToSearch, 10);
-    if (isNaN(numInt) || numInt < 1 || numInt > 678) return;
+  const isFirstMount = useRef(true);
 
-    const mappedName = playerMapping[numToSearch];
-    if (!mappedName) return;
+  // Debounce search effect
+  useEffect(() => {
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      return;
+    }
 
-    setSearching(true);
-    setApiError('');
-    try {
-      const response = await searchPlayer(mappedName);
-      if (response && response.response && response.response.length > 0) {
-        setNombre(response.response[0].player.name);
-      } else {
-        setApiError('Jugador no encontrado');
+    const handler = setTimeout(() => {
+      if (numero) {
+        handleSearch(numero);
       }
-    } catch (error) {
-      setApiError('No se pudo obtener el nombre. ¿Reintentar?');
-    } finally {
-      setSearching(false);
+    }, 800);
+
+    return () => clearTimeout(handler);
+  }, [numero]);
+
+  const handleSearch = async (numStr: string) => {
+    const num = parseInt(numStr, 10);
+    
+    // Reset flags for new search
+    setApiError('');
+    setShowCheck(false);
+    
+    if (isNaN(num) || num < 1 || num > 678) {
+      return;
+    }
+
+    const mapped = playerMapping[num];
+    if (mapped) {
+      if (!userEditedName) {
+        setNombre(mapped.name);
+      }
+      
+      setSearching(true);
+      try {
+        const { data, error } = await searchPlayer(mapped.name);
+        
+        if (error) {
+          setApiError('No se pudo obtener la imagen. ¿Reintentar?');
+        } else if (data) {
+          if (!userEditedName) {
+            setNombre(data.name);
+          }
+          
+          if (data.photo) {
+            try {
+              const url = await uploadPlayerImage(data.photo, `${num}-${data.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.png`);
+              setImageUrl(url);
+            } catch (err) {
+              console.error('Error uploading image', err);
+            }
+          }
+          
+          setShowCheck(true);
+          setTimeout(() => setShowCheck(false), 2000);
+        } else {
+          setApiError('Jugador no encontrado. Podés guardarlo sin nombre.');
+        }
+      } catch (err) {
+        setApiError('No se pudo obtener la imagen. ¿Reintentar?');
+      } finally {
+        setSearching(false);
+      }
+    } else {
+      if (!userEditedName) {
+        setNombre('');
+      }
     }
   };
 
-  useEffect(() => {
-    if (!numero) return;
+  const handleNameChange = (text: string) => {
+    setNombre(text);
+    setUserEditedName(true);
+  };
 
-    const timer = setTimeout(() => {
-      handleSearchPlayer(numero);
-    }, 800);
-
-    return () => clearTimeout(timer);
-  }, [numero]);
+  const handleRetrySearch = () => {
+    handleSearch(numero);
+  };
 
   const handleSave = async () => {
-    if (!numero || !tipo) return;
-
-    const numInt = parseInt(numero, 10);
-    if (isNaN(numInt) || numInt < 1 || numInt > 678) {
+    setErrorMessage('');
+    
+    const num = parseInt(numero, 10);
+    if (isNaN(num) || num < 1 || num > 678) {
       setErrorMessage('El número debe estar entre 1 y 678');
       return;
     }
 
-    if (!user || !user.id) {
-      setErrorMessage('Debes iniciar sesión para guardar');
+    if (!tipo) {
+      setErrorMessage('Seleccioná el tipo de figurita');
+      return;
+    }
+
+    if (!user?.id) {
+      setErrorMessage('Error de sesión. Volvé a ingresar.');
       return;
     }
 
     setSaving(true);
-    setErrorMessage('');
+    
     try {
-      await addFigurita(user.id, {
-        numero: numInt,
-        tipo,
-        nombre_jugador: nombre,
-      });
+      const { error } = await supabase
+        .from('figuritas')
+        .insert({
+          user_id: user.id,
+          numero: num,
+          tipo,
+          nombre_jugador: nombre || null,
+          imagen_url: imageUrl,
+          seleccion: playerMapping[num]?.seleccion || null
+        });
+
+      if (error) throw error;
+      
       navigation.goBack();
-    } catch (error) {
-      setErrorMessage('Error al guardar la figurita');
+    } catch (err) {
+      console.error(err);
+      setErrorMessage('Error al guardar la figurita. Reintentá.');
     } finally {
       setSaving(false);
     }
   };
 
+  const numError = numero && (parseInt(numero, 10) < 1 || parseInt(numero, 10) > 678) 
+    ? 'El número debe estar entre 1 y 678' 
+    : undefined;
+
+  const isSaveDisabled = !numero || !!numError || !tipo;
+
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>{'< Volver'}</Text>
+          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Agregar figurita</Text>
-        <View style={{ width: 60 }} />
+        <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Input
-          label="Número de la figurita"
-          placeholder="Ej: 10"
-          value={numero}
-          onChangeText={(val) => {
-            setNumero(val.replace(/[^0-9]/g, ''));
-            setApiError('');
-          }}
-          keyboardType="numeric"
-          maxLength={3}
-        />
-
-        <View style={styles.nombreContainer}>
+      <KeyboardAvoidingView 
+        style={styles.container} 
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          
           <Input
-            label="Nombre del jugador (opcional)"
-            placeholder="Ej: Lionel Messi"
-            value={nombre}
-            onChangeText={setNombre}
-            loading={searching}
+            label="Número de figurita"
+            placeholder="Ej: 10"
+            value={numero}
+            onChangeText={(text) => {
+              const numericValue = text.replace(/[^0-9]/g, '');
+              setNumero(numericValue);
+            }}
+            keyboardType="number-pad"
+            errorMessage={numError}
           />
-          {apiError ? (
-            <View style={styles.apiErrorContainer}>
-              <Text style={styles.apiErrorText}>{apiError}</Text>
-              <TouchableOpacity onPress={() => handleSearchPlayer(numero)}>
-                <Text style={styles.retryText}>Reintentar</Text>
-              </TouchableOpacity>
-            </View>
-          ) : null}
-        </View>
 
-        <Text style={styles.label}>¿Qué tipo de figurita es?</Text>
-        <View style={styles.segmentedControl}>
-          <TouchableOpacity
-            style={[
-              styles.segmentButton,
-              tipo === 'repetida' && styles.segmentButtonRepetida,
-            ]}
-            onPress={() => setTipo('repetida')}
-            activeOpacity={0.7}
-          >
-            <Text
+          <View style={styles.nameInputContainer}>
+            <Input
+              label="Nombre del jugador (Opcional)"
+              placeholder="Ej: Lionel Messi"
+              value={nombre}
+              onChangeText={handleNameChange}
+              loading={searching}
+              rightIcon={
+                showCheck ? <Ionicons name="checkmark-circle" size={20} color={colors.secondary} /> : undefined
+              }
+            />
+            {apiError ? (
+              <View style={styles.apiErrorContainer}>
+                <Text style={styles.apiErrorText}>{apiError}</Text>
+                {apiError.includes('¿Reintentar?') && (
+                  <TouchableOpacity onPress={handleRetrySearch}>
+                    <Text style={styles.retryText}>Reintentar</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ) : null}
+          </View>
+
+          <Text style={styles.typeLabel}>Tipo de figurita</Text>
+          <View style={styles.typeContainer}>
+            <TouchableOpacity
               style={[
-                styles.segmentButtonText,
-                tipo === 'repetida' && styles.segmentButtonTextActive,
+                styles.typeButton,
+                tipo === 'repetida' && { backgroundColor: colors.secondary, borderColor: colors.secondary }
               ]}
+              onPress={() => setTipo('repetida')}
+              activeOpacity={0.8}
             >
-              La tengo repetida
-            </Text>
-          </TouchableOpacity>
+              <Text style={[styles.typeButtonText, tipo === 'repetida' && styles.typeButtonTextActive]}>
+                La tengo repetida
+              </Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[
-              styles.segmentButton,
-              tipo === 'faltante' && styles.segmentButtonFaltante,
-            ]}
-            onPress={() => setTipo('faltante')}
-            activeOpacity={0.7}
-          >
-            <Text
+            <TouchableOpacity
               style={[
-                styles.segmentButtonText,
-                tipo === 'faltante' && styles.segmentButtonTextActive,
+                styles.typeButton,
+                tipo === 'faltante' && { backgroundColor: colors.warning, borderColor: colors.warning }
               ]}
+              onPress={() => setTipo('faltante')}
+              activeOpacity={0.8}
             >
-              La necesito
-            </Text>
-          </TouchableOpacity>
-        </View>
+              <Text style={[styles.typeButtonText, tipo === 'faltante' && styles.typeButtonTextActive]}>
+                La necesito
+              </Text>
+            </TouchableOpacity>
+          </View>
 
-        {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+          {errorMessage ? <Text style={styles.mainErrorText}>{errorMessage}</Text> : null}
 
-        <View style={styles.buttonContainer}>
-          <Button
-            title="Guardar figurita"
-            onPress={handleSave}
-            disabled={!numero || !tipo}
-            loading={saving}
-          />
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+          <View style={styles.footer}>
+            <Button
+              title="Guardar figurita"
+              onPress={handleSave}
+              variant="primary"
+              disabled={isSaveDisabled}
+              loading={saving}
+            />
+          </View>
+
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
-export default AddFiguritaScreen;
-
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.background || '#FFFFFF',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingTop: Platform.OS === 'ios' ? 50 : 20,
-    paddingBottom: spacing.md,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
-    backgroundColor: colors.background,
   },
   backButton: {
-    width: 60,
-  },
-  backButtonText: {
-    color: colors.primary,
-    fontSize: fontSizes.body,
-    fontWeight: '500',
+    padding: 4,
   },
   headerTitle: {
-    fontSize: fontSizes.h2,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '600',
     color: colors.textPrimary,
   },
-  scrollContent: {
-    padding: spacing.lg,
+  container: {
+    flex: 1,
   },
-  nombreContainer: {
-    marginBottom: spacing.xs,
+  scrollContent: {
+    padding: 24,
+  },
+  nameInputContainer: {
+    marginBottom: 8,
   },
   apiErrorContainer: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.md,
-    paddingHorizontal: spacing.xs,
+    marginTop: -8,
+    marginBottom: 16,
   },
   apiErrorText: {
+    fontSize: 12,
     color: colors.error,
-    fontSize: fontSizes.caption,
+    flex: 1,
   },
   retryText: {
+    fontSize: 12,
     color: colors.primary,
-    fontSize: fontSizes.caption,
-    fontWeight: 'bold',
+    fontWeight: '600',
+    marginLeft: 8,
   },
-  label: {
+  typeLabel: {
     fontSize: 14,
     color: colors.textSecondary,
-    marginBottom: spacing.sm,
-    fontWeight: '500',
+    marginBottom: 8,
   },
-  segmentedControl: {
+  typeContainer: {
     flexDirection: 'row',
-    marginBottom: spacing.lg,
-    gap: spacing.md,
+    justifyContent: 'space-between',
+    marginBottom: 24,
   },
-  segmentButton: {
+  typeButton: {
     flex: 1,
     height: 48,
-    borderRadius: borderRadius.sm,
     borderWidth: 1,
     borderColor: colors.border,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.surface,
+    marginHorizontal: 4,
+    backgroundColor: '#FFFFFF',
   },
-  segmentButtonRepetida: {
-    backgroundColor: colors.secondary,
-    borderColor: colors.secondary,
-  },
-  segmentButtonFaltante: {
-    backgroundColor: colors.warning,
-    borderColor: colors.warning,
-  },
-  segmentButtonText: {
-    color: colors.textPrimary,
-    fontWeight: '600',
+  typeButtonText: {
     fontSize: 14,
+    fontWeight: '600',
+    color: colors.textPrimary,
   },
-  segmentButtonTextActive: {
+  typeButtonTextActive: {
     color: '#FFFFFF',
   },
-  errorText: {
-    color: colors.error,
+  mainErrorText: {
     fontSize: 14,
+    color: colors.error,
     textAlign: 'center',
-    marginBottom: spacing.md,
+    marginBottom: 16,
   },
-  buttonContainer: {
-    marginTop: spacing.sm,
+  footer: {
+    marginTop: 16,
   },
 });
