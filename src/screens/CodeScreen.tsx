@@ -1,32 +1,34 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, Share } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, Share } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import QRCode from 'react-native-qrcode-svg';
-import { colors, spacing, borderRadius, fontSizes } from '../constants/theme';
+import { Ionicons } from '@expo/vector-icons';
 import { Button } from '../components/Button';
+import { StatusScreen } from '../components/StatusScreen';
+import { colors } from '../constants/theme';
+import { CodeScreenParams } from '../types';
 
-export interface CodeScreenParams {
-  codigo: string;
-  kioscoNombre: string;
-  kioscoDireccion: string;
-  kioscoId: number;
-  figuritaEntregar: { number: number; name?: string };
-  figuritaRecibir: { number: number; name?: string };
-  otroUsuario?: string;
-}
+type CodeScreenRouteProp = RouteProp<{ params: CodeScreenParams }, 'params'>;
 
-type RootStackParamList = {
-  Code: CodeScreenParams;
-  Map: { kioscoId: string };
-};
+export const CodeScreen: React.FC = () => {
+  const navigation = useNavigation<any>();
+  const route = useRoute<CodeScreenRouteProp>();
 
-export const CodeScreen = () => {
-  // Any para simplificar navegación si no está el stack completamente tipado globalmente
-  const navigation = useNavigation<any>(); 
-  const route = useRoute<RouteProp<RootStackParamList, 'Code'>>();
   const params = route.params;
 
-  if (!params) return null; // Fallback temporal
+  if (!params) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusScreen
+          type="error"
+          title="Error"
+          description="No se encontraron los datos del intercambio"
+          actionLabel="Volver"
+          onAction={() => navigation.goBack()}
+        />
+      </SafeAreaView>
+    );
+  }
 
   const {
     codigo,
@@ -35,154 +37,154 @@ export const CodeScreen = () => {
     kioscoId,
     figuritaEntregar,
     figuritaRecibir,
-    otroUsuario,
+    otroUsuario
   } = params;
 
   const handleShare = async () => {
     try {
       await Share.share({
-        message: codigo,
+        message: `Mi código de intercambio FiguMatch: ${codigo}`,
       });
     } catch (error) {
-      console.log('Error compartiendo código', error);
+      console.error(error);
     }
   };
 
-  const handleGoToMap = () => {
-    // casteamos a string porque MapScreen suele esperar id string
-    navigation.navigate('Map', { kioscoId: String(kioscoId) });
+  const handleViewMap = () => {
+    navigation.goBack();
+    // Pequeño timeout para permitir que el modal se cierre antes de navegar al tab
+    setTimeout(() => {
+      navigation.navigate('KioscosTab', {
+        screen: 'Map',
+        params: { kioscoId }
+      });
+    }, 100);
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>{'< Volver'}</Text>
+          <Ionicons name="close" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Código de intercambio</Text>
-        <View style={{ width: 60 }} />
+        <View style={{ width: 24 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         
+        <View style={styles.codeContainer}>
+          <Text style={styles.codeText}>{codigo}</Text>
+        </View>
+
         <View style={styles.qrContainer}>
           <QRCode
             value={codigo}
             size={200}
-            color={colors.textPrimary}
-            backgroundColor={colors.background}
           />
         </View>
-
-        <Text style={styles.codigoText}>{codigo}</Text>
 
         <View style={styles.instructionsContainer}>
           <Text style={styles.instructionText}>
-            Prepará tu figurita Nº {figuritaEntregar.number} en un sobre con el código <Text style={styles.boldText}>{codigo}</Text>.
+            1. Prepará tu figurita Nº {figuritaEntregar.number} en un sobre con el código {codigo}.
           </Text>
           <Text style={styles.instructionText}>
-            Llevalo a <Text style={styles.boldText}>{kioscoNombre}</Text> ({kioscoDireccion}) antes de las 20 h.
+            2. Llevalo a {kioscoNombre} ({kioscoDireccion}) antes de las 20 h.
           </Text>
           <Text style={styles.instructionText}>
-            <Text style={styles.boldText}>{otroUsuario || 'La otra persona'}</Text> dejará la Nº {figuritaRecibir.number}. Podés retirarla desde mañana.
+            3. {otroUsuario || 'La otra persona'} dejará la Nº {figuritaRecibir.number}. Podés retirarla desde mañana.
           </Text>
         </View>
 
+        <Text style={styles.infoText}>
+          El Kiosco {kioscoNombre} es parte de la red FiguMatch y ya recibió tu solicitud de intercambio.
+        </Text>
+
         <View style={styles.buttonsContainer}>
-          <Button
-            title="Ver en el mapa"
-            variant="secondary"
-            onPress={handleGoToMap}
-          />
-          <View style={{ height: spacing.md }} />
           <Button
             title="Compartir código"
             variant="secondary"
             onPress={handleShare}
           />
+          <Button
+            title="Ver en el mapa"
+            variant="secondary"
+            onPress={handleViewMap}
+          />
         </View>
 
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 };
 
-export default CodeScreen;
-
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#FFFFFF',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingTop: Platform.OS === 'ios' ? 50 : 20,
-    paddingBottom: spacing.md,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
-    backgroundColor: colors.background,
   },
   backButton: {
-    width: 60,
-  },
-  backButtonText: {
-    color: colors.primary,
-    fontSize: fontSizes.body,
-    fontWeight: '500',
+    padding: 4,
   },
   headerTitle: {
-    fontSize: fontSizes.h2,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '600',
     color: colors.textPrimary,
   },
   scrollContent: {
-    padding: spacing.lg, // 24
+    padding: 24,
     alignItems: 'center',
+    gap: 24,
+  },
+  codeContainer: {
+    backgroundColor: '#F2F2F7',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+  },
+  codeText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: colors.textPrimary,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    textAlign: 'center',
   },
   qrContainer: {
-    marginBottom: spacing.lg,
-    padding: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
     backgroundColor: '#FFFFFF',
-    borderRadius: borderRadius.md,
-    // Sombra para destacar el código QR sutilmente
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  codigoText: {
-    fontSize: fontSizes.code, // 24px
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontWeight: 'bold',
-    color: colors.textPrimary, // #1C1C1E
-    backgroundColor: colors.surface, // #F2F2F7
-    padding: spacing.md, // 16
-    borderRadius: borderRadius.sm, // 8
-    textAlign: 'center',
-    marginBottom: spacing.xl,
-    overflow: 'hidden',
   },
   instructionsContainer: {
     width: '100%',
     gap: 12,
-    marginBottom: spacing.xl,
   },
   instructionText: {
-    fontSize: fontSizes.body,
+    fontSize: 16,
+    color: colors.textPrimary,
+    lineHeight: 24,
+  },
+  infoText: {
+    fontSize: 14,
     color: colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 22,
-  },
-  boldText: {
-    color: colors.textPrimary,
-    fontWeight: 'bold',
+    lineHeight: 20,
+    paddingHorizontal: 16,
   },
   buttonsContainer: {
     width: '100%',
-    maxWidth: 320,
+    gap: 16,
+    marginTop: 8,
   },
 });
