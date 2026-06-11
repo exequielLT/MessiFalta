@@ -1,40 +1,28 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ViewStyle, StyleProp } from 'react-native';
-import { colors, borderRadius, spacing, fontSizes } from '../constants/theme';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { colors } from '../constants/theme';
 
 interface CardFiguritaProps {
-  number: number | string;
+  number: number;
   type: 'repetida' | 'faltante';
   playerName?: string;
   onPress?: () => void;
-  style?: StyleProp<ViewStyle>;
 }
 
-export const CardFigurita: React.FC<CardFiguritaProps> = ({
-  number,
-  type,
-  playerName,
-  onPress,
-  style,
-}) => {
+export const CardFigurita: React.FC<CardFiguritaProps> = ({ number, type, playerName, onPress }) => {
   const isRepetida = type === 'repetida';
-  const typeLabel = isRepetida ? 'Repetida' : 'Faltante';
   const circleColor = isRepetida ? colors.secondary : colors.warning;
+  const tagText = isRepetida ? 'Repetida' : 'Faltante';
 
   const content = (
-    <View style={[styles.container, style]}>
+    <View style={styles.container}>
       <View style={[styles.circle, { backgroundColor: circleColor }]}>
-        <Text style={styles.numberText}>{number}</Text>
+        <Text style={styles.number}>{number}</Text>
       </View>
+      
       <View style={styles.infoContainer}>
-        {playerName ? (
-          <Text style={styles.playerName} numberOfLines={1}>
-            {playerName}
-          </Text>
-        ) : (
-          <Text style={styles.playerName}>Figurita #{number}</Text>
-        )}
-        <Text style={styles.typeLabel}>{typeLabel}</Text>
+        {playerName && <Text style={styles.playerName}>{playerName}</Text>}
+        <Text style={styles.tagText}>{tagText}</Text>
       </View>
     </View>
   );
@@ -56,9 +44,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: 16,
+    backgroundColor: '#FFFFFF',
+    marginBottom: 8,
   },
   circle: {
     width: 40,
@@ -66,11 +55,11 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.md,
+    marginRight: 12,
   },
-  numberText: {
+  number: {
     color: '#FFFFFF',
-    fontSize: fontSizes.body,
+    fontSize: 16,
     fontWeight: 'bold',
   },
   infoContainer: {
@@ -78,13 +67,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   playerName: {
+    fontSize: 16,
     color: colors.textPrimary,
-    fontSize: fontSizes.body,
-    fontWeight: '600',
-    marginBottom: 4,
+    marginBottom: 2,
   },
-  typeLabel: {
+  tagText: {
+    fontSize: 12,
     color: colors.textSecondary,
-    fontSize: fontSizes.caption,
   },
 });

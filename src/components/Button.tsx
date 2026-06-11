@@ -1,70 +1,54 @@
 import React from 'react';
-import {
-  TouchableOpacity,
-  Text,
-  ActivityIndicator,
-  StyleSheet,
-  StyleProp,
-  ViewStyle,
-} from 'react-native';
-import { borderRadius, sizes, spacing, fontSizes } from '../constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { TouchableOpacity, Text, ActivityIndicator, StyleSheet, ViewStyle, TextStyle } from 'react-native';
+import { colors } from '../constants/theme';
 
 interface ButtonProps {
   title: string;
   onPress: () => void;
-  variant?: 'primary' | 'secondary' | 'danger';
+  variant: 'primary' | 'secondary' | 'danger';
   loading?: boolean;
   disabled?: boolean;
-  style?: StyleProp<ViewStyle>;
+  style?: ViewStyle;
 }
 
-export const Button: React.FC<ButtonProps> = ({
-  title,
-  onPress,
-  variant = 'primary',
-  loading = false,
-  disabled = false,
-  style,
-}) => {
-  const theme = useTheme();
+export const Button: React.FC<ButtonProps> = ({ title, onPress, variant, loading = false, disabled = false, style }) => {
   const isSecondary = variant === 'secondary';
+  const isDanger = variant === 'danger';
 
-  let containerStyle: StyleProp<ViewStyle> = [styles.container];
-  let textStyle: any[] = [styles.text];
+  let backgroundColor = colors.primary;
+  let textColor = '#FFFFFF';
+  let borderColor = 'transparent';
 
-  if (variant === 'primary') {
-    containerStyle.push({ backgroundColor: theme.primary });
-    textStyle.push({ color: theme.onPrimary });
-  } else if (variant === 'secondary') {
-    containerStyle.push({
-      backgroundColor: 'transparent',
-      borderWidth: 2,
-      borderColor: theme.primary,
-    });
-    textStyle.push({ color: theme.primary });
-  } else if (variant === 'danger') {
-    containerStyle.push({ backgroundColor: theme.error });
-    textStyle.push({ color: theme.onError });
+  if (isSecondary) {
+    backgroundColor = 'transparent';
+    textColor = colors.primary;
+    borderColor = colors.primary;
+  } else if (isDanger) {
+    backgroundColor = colors.error;
   }
 
-  if (disabled || loading) {
-    containerStyle.push(styles.disabled);
-  }
+  const containerStyle = [
+    styles.container,
+    { backgroundColor, borderColor, borderWidth: isSecondary ? 2 : 0 },
+    (disabled || loading) && styles.disabled,
+    style,
+  ];
+
+  const textStyle: TextStyle = {
+    ...styles.text,
+    color: textColor,
+  };
 
   return (
     <TouchableOpacity
-      style={[containerStyle, style]}
+      style={containerStyle}
       onPress={onPress}
       disabled={disabled || loading}
       activeOpacity={0.8}
     >
       {loading ? (
         <>
-          <ActivityIndicator
-            color={isSecondary ? theme.primary : theme.onPrimary}
-            style={styles.loader}
-          />
+          <ActivityIndicator color={textColor} style={styles.loader} />
           <Text style={textStyle}>Cargando...</Text>
         </>
       ) : (
@@ -76,21 +60,21 @@ export const Button: React.FC<ButtonProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    height: sizes.buttonHeight,
-    borderRadius: borderRadius.md,
-    paddingHorizontal: spacing.lg,
+    height: 48,
+    borderRadius: 12,
+    paddingHorizontal: 24,
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
   },
   text: {
-    fontSize: fontSizes.body,
+    fontSize: 16,
     fontWeight: '600',
-  },
-  loader: {
-    marginRight: spacing.sm,
   },
   disabled: {
     opacity: 0.5,
+  },
+  loader: {
+    marginRight: 8,
   },
 });
