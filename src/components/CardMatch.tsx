@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { colors } from '../constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import { Ionicons } from '@expo/vector-icons';
 
 interface FiguritaInfo {
@@ -15,6 +15,9 @@ interface CardMatchProps {
   requestedFigurita: FiguritaInfo;
   distance?: string;
   onPress?: () => void;
+  avatarUrl?: string;
+  tradesCount?: number;
+  style?: any;
 }
 
 export const CardMatch: React.FC<CardMatchProps> = ({
@@ -24,12 +27,17 @@ export const CardMatch: React.FC<CardMatchProps> = ({
   requestedFigurita,
   distance,
   onPress,
+  avatarUrl,
+  tradesCount,
+  style,
 }) => {
+  const theme = useTheme();
+
   const renderStars = () => {
     const stars = [];
     for (let i = 1; i <= 5; i++) {
       stars.push(
-        <Text key={i} style={{ color: i <= reputation ? colors.primary : colors.border, fontSize: 14 }}>
+        <Text key={i} style={{ color: i <= reputation ? '#FF9500' : theme.outlineVariant, fontSize: 14 }}>
           {i <= reputation ? '★' : '☆'}
         </Text>
       );
@@ -38,26 +46,26 @@ export const CardMatch: React.FC<CardMatchProps> = ({
   };
 
   const content = (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.surfaceContainerLowest, borderColor: theme.outlineVariant }, style]}>
       <View style={styles.contentContainer}>
         <View style={styles.headerRow}>
-          <Text style={styles.userName}>{userName}</Text>
+          <Text style={[styles.userName, { color: theme.onSurface }]}>{userName}</Text>
           {renderStars()}
         </View>
 
-        <View style={styles.tradeRow}>
-          <Text style={styles.tradeLabel}>Ofrece: </Text>
-          <View style={[styles.tag, { backgroundColor: colors.secondary + '20' }]}>
-            <Text style={[styles.tagText, { color: colors.secondary }]}>
+        <View style={tradeRowStyle(styles.tradeRow)}>
+          <Text style={[styles.tradeLabel, { color: theme.onSurface }]}>Ofrece: </Text>
+          <View style={[styles.tag, { backgroundColor: theme.secondary + '20' }]}>
+            <Text style={[styles.tagText, { color: theme.secondary }]}>
               Nº {offeredFigurita.number}{offeredFigurita.name ? ` - ${offeredFigurita.name}` : ''}
             </Text>
           </View>
         </View>
 
-        <View style={styles.tradeRow}>
-          <Text style={styles.tradeLabel}>Busca: </Text>
-          <View style={[styles.tag, { backgroundColor: colors.warning + '20' }]}>
-            <Text style={[styles.tagText, { color: colors.warning }]}>
+        <View style={tradeRowStyle(styles.tradeRow)}>
+          <Text style={[styles.tradeLabel, { color: theme.onSurface }]}>Busca: </Text>
+          <View style={[styles.tag, { backgroundColor: theme.tertiary + '20' }]}>
+            <Text style={[styles.tagText, { color: theme.tertiary }]}>
               Nº {requestedFigurita.number}{requestedFigurita.name ? ` - ${requestedFigurita.name}` : ''}
             </Text>
           </View>
@@ -65,15 +73,15 @@ export const CardMatch: React.FC<CardMatchProps> = ({
 
         {distance && (
           <View style={styles.distanceRow}>
-            <Ionicons name="location-outline" size={14} color={colors.textSecondary} />
-            <Text style={styles.distanceText}>{distance}</Text>
+            <Ionicons name="location-outline" size={14} color={theme.onSurfaceVariant} />
+            <Text style={[styles.distanceText, { color: theme.onSurfaceVariant }]}>{distance}</Text>
           </View>
         )}
       </View>
 
       {onPress && (
         <View style={styles.chevronContainer}>
-          <Ionicons name="chevron-forward" size={24} color={colors.border} />
+          <Ionicons name="chevron-forward" size={24} color={theme.outlineVariant} />
         </View>
       )}
     </View>
@@ -90,14 +98,15 @@ export const CardMatch: React.FC<CardMatchProps> = ({
   return content;
 };
 
+// Helper helper for tradeRow styling types
+const tradeRowStyle = (style: any): any => style;
+
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: 12,
     padding: 16,
-    backgroundColor: '#FFFFFF',
     marginBottom: 8,
   },
   contentContainer: {
@@ -111,7 +120,6 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.textPrimary,
     marginRight: 8,
   },
   starsContainer: {
@@ -125,7 +133,6 @@ const styles = StyleSheet.create({
   },
   tradeLabel: {
     fontSize: 14,
-    color: colors.textPrimary,
     marginRight: 4,
   },
   tag: {
@@ -144,7 +151,6 @@ const styles = StyleSheet.create({
   },
   distanceText: {
     fontSize: 14,
-    color: colors.textSecondary,
     marginLeft: 4,
   },
   chevronContainer: {
