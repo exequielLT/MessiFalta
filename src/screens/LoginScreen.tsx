@@ -1,18 +1,18 @@
+import { Button } from '@/components/Button';
+import { Input } from '@/components/Input';
+import { colors } from '@/constants/theme';
+import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
-  StyleSheet,
-  View,
-  Text,
-  SafeAreaView,
-  TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  SafeAreaView,
   ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { Input } from '@/components/Input';
-import { Button } from '@/components/Button';
-import { colors } from '@/constants/theme';
 
 interface LoginScreenProps {
   onLogin: () => void;
@@ -94,6 +94,17 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
               loading={loading}
               style={styles.submitButton}
             />
+       <View style={styles.dividerContainer}>
+        <View style={styles.divider} />
+        <Text style={styles.dividerText}>o</Text>
+        <View style={styles.divider} />
+       </View>
+
+      <Button
+        title="Continuar con Google"
+        onPress={() => console.log('Google Login')}
+        variant="secondary"
+      />
 
             <TouchableOpacity style={styles.forgotPassword}>
               <Text style={[styles.forgotText, { color: colors.primary }]}>
