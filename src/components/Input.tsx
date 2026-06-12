@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, TextInput, Text, StyleSheet, ViewStyle, KeyboardTypeOptions, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, TextInput, Text, StyleSheet, ViewStyle, TextStyle, KeyboardTypeOptions, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { colors } from '../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -14,6 +14,10 @@ interface InputProps {
   loading?: boolean;
   rightIcon?: React.ReactNode;
   style?: ViewStyle;
+  labelStyle?: TextStyle;
+  inputContainerStyle?: ViewStyle;
+  inputStyle?: TextStyle;
+  placeholderTextColor?: string;
 }
 
 export const Input: React.FC<InputProps> = ({
@@ -27,20 +31,24 @@ export const Input: React.FC<InputProps> = ({
   loading = false,
   rightIcon,
   style,
+  labelStyle,
+  inputContainerStyle,
+  inputStyle,
+  placeholderTextColor = colors.textSecondary,
 }) => {
   const [isSecure, setIsSecure] = useState(secureTextEntry);
 
   return (
     <View style={[styles.container, style]}>
-      {label && <Text style={styles.label}>{label}</Text>}
+      {label && <Text style={[styles.label, labelStyle]}>{label}</Text>}
       
-      <View style={[styles.inputContainer, errorMessage ? styles.inputError : null]}>
+      <View style={[styles.inputContainer, errorMessage ? styles.inputError : null, inputContainerStyle]}>
         <TextInput
-          style={styles.input}
+          style={[styles.input, inputStyle]}
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
-          placeholderTextColor={colors.textSecondary}
+          placeholderTextColor={placeholderTextColor}
           secureTextEntry={isSecure}
           keyboardType={keyboardType}
         />
