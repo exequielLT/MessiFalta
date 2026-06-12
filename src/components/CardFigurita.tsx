@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { colors } from '../constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
 interface CardFiguritaProps {
   number: number;
@@ -10,19 +10,20 @@ interface CardFiguritaProps {
 }
 
 export const CardFigurita: React.FC<CardFiguritaProps> = ({ number, type, playerName, onPress }) => {
+  const theme = useTheme();
   const isRepetida = type === 'repetida';
-  const circleColor = isRepetida ? colors.secondary : colors.warning;
+  const circleColor = isRepetida ? theme.secondary : theme.tertiary;
   const tagText = isRepetida ? 'Repetida' : 'Faltante';
 
   const content = (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.surfaceContainerLowest, borderColor: theme.outlineVariant }]}>
       <View style={[styles.circle, { backgroundColor: circleColor }]}>
         <Text style={styles.number}>{number}</Text>
       </View>
       
       <View style={styles.infoContainer}>
-        {playerName && <Text style={styles.playerName}>{playerName}</Text>}
-        <Text style={styles.tagText}>{tagText}</Text>
+        {playerName && <Text style={[styles.playerName, { color: theme.onSurface }]}>{playerName}</Text>}
+        <Text style={[styles.tagText, { color: theme.onSurfaceVariant }]}>{tagText}</Text>
       </View>
     </View>
   );
@@ -43,10 +44,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: 12,
     padding: 16,
-    backgroundColor: '#FFFFFF',
     marginBottom: 8,
   },
   circle: {
@@ -68,11 +67,9 @@ const styles = StyleSheet.create({
   },
   playerName: {
     fontSize: 16,
-    color: colors.textPrimary,
     marginBottom: 2,
   },
   tagText: {
     fontSize: 12,
-    color: colors.textSecondary,
   },
 });
