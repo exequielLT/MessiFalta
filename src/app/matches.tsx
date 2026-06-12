@@ -1,32 +1,38 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  StyleSheet, 
-  ScrollView, 
-  View, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  Image, 
+import AppHeader from '@/components/AppHeader';
+import { Button } from '@/components/Button';
+import { CardMatch } from '@/components/CardMatch';
+import { ThemedView } from '@/components/themed-view';
+import { spacing } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useTheme } from '@/hooks/use-theme';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import {
   ActivityIndicator,
   Animated,
+  Image,
   Modal,
   Platform,
-  Share
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
-import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import QRCode from 'react-native-qrcode-svg';
-import AppHeader from '@/components/AppHeader';
-import { ThemedView } from '@/components/themed-view';
-import { useTheme } from '@/hooks/use-theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { spacing } from '@/constants/theme';
-import { CardMatch } from '@/components/CardMatch';
-import { Button } from '@/components/Button';
 
 // Assets
 const cloudLightningIcon = require('../../assets/images/matches/Cloud-Lightning-Icon.png');
 const emptySearchIcon = require('../../assets/images/matches/img-busqueda-vacia.png');
+
+interface FiguritaDetail {
+  number: number;
+  name: string;
+  imageUrl?: string;
+}
 
 interface MatchInfo {
   id: string;
@@ -34,12 +40,13 @@ interface MatchInfo {
   avatarUrl: string;
   reputation: number;
   tradesCount: number;
-  offeredFigurita: { number: number; name: string };
-  requestedFigurita: { number: number; name: string };
+  offeredFigurita: FiguritaDetail;
+  requestedFigurita: FiguritaDetail;
   distance: string;
   kioscoId: number;
   kioscoNombre: string;
   kioscoDireccion: string;
+  barrio: string;
 }
 
 const DUMMY_MATCHES: MatchInfo[] = [
@@ -49,12 +56,21 @@ const DUMMY_MATCHES: MatchInfo[] = [
     avatarUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuA1tl8OM8e9-ifhgYdCB4f6DE3LPOq3CwIzQjuWA_4sQt5B-GXbOY55dOzlr089DewzxLfVdCr6V-srgOn7vWr9gLC-I5fYXAF-lHwLJ-E56rD6crSSrsPj6zrsKooxLQuHzaUBCuzeySyBCX5SR1wY3Y_PtKbJ6TGVq_4GEmn3tQTZaq9IKGcWrhA5jKkuq1Pjwrb1uNcKPEh2JNfjt6PF3pEGOKKttRA0G-dU66zn_0tlciHWmtgoFJJfVNUvN6eHU5aIihQkHKfs',
     reputation: 4,
     tradesCount: 12,
-    offeredFigurita: { number: 200, name: 'Lionel Messi' },
-    requestedFigurita: { number: 89, name: 'Julián Álvarez' },
+    offeredFigurita: { 
+      number: 200, 
+      name: 'Lionel Messi',
+      imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuA2lW5nE-CCDfNshcaCoJQ5fAAKeOURw1XEmCaOZeH-1NEwPHaWeVypUCt6F44ITkD521Zq4BuVy3lJ9acArQsun9CnHk47xluyJJY6bM2O37J-Ghcg28v-cQemkwBwEjGPsdS4lu-cl4ghjb5f9lUmSZ36Hr5zCxfm1iDB_ROscdvhiWRuZcxX99-dscH48ttbBS4JA3Vv5k-8TqibfYyrY9D3DsoQQFuJ4lPEkZKze6iHQZ9g2Q3hC3juZooiWaCFSdqcAGr-9ySk'
+    },
+    requestedFigurita: { 
+      number: 89, 
+      name: 'Julián Álvarez',
+      imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBWNcxBL0mj4v8zkPnVIILx6HUePmjCztaXOSP6_KJFkcpLrtRNU-OEQtp5E4eGUJI3TevSGNQ4-SC-tyPpoZ7zgWsvdAt47YJnERPQkXApGSPoryyBQy2J2JdW52__fmaAlNeLgKs394BY1-Nz89IKRlMRNBfvq6p6AZWc03ODJir_fvCPb8n7Mo7dWfwwoe4M4ixQKTB_NOg1w8CbRdIlZPwQB-aEZJG9v2PRPwlIkGiwSGkcCG_JlPJeM7OabvB8UzpD4zaLEQBD'
+    },
     distance: 'Kiosco a 300 m',
     kioscoId: 1,
-    kioscoNombre: 'Kiosco Central',
-    kioscoDireccion: 'San Martín 500',
+    kioscoNombre: 'Kiosco San Cayetano',
+    kioscoDireccion: 'Av. Belgrano 450',
+    barrio: 'Barrio Centro',
   },
   {
     id: '2',
@@ -68,6 +84,7 @@ const DUMMY_MATCHES: MatchInfo[] = [
     kioscoId: 2,
     kioscoNombre: 'Parada Sur',
     kioscoDireccion: 'Rivadavia 1200',
+    barrio: 'Barrio Sur',
   },
   {
     id: '3',
@@ -81,6 +98,7 @@ const DUMMY_MATCHES: MatchInfo[] = [
     kioscoId: 3,
     kioscoNombre: 'Kiosquito Norte',
     kioscoDireccion: 'Belgrano 250',
+    barrio: 'Barrio Norte',
   },
 ];
 
@@ -100,6 +118,7 @@ export default function MatchesScreen() {
   const [selectedMatch, setSelectedMatch] = useState<MatchInfo | null>(null);
   const [modalView, setModalView] = useState<'detail' | 'code'>('detail');
   const [generatedCode, setGeneratedCode] = useState('');
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   // Pulse animation values for loading state
   const [ring1Scale] = useState(() => new Animated.Value(1));
@@ -172,10 +191,18 @@ export default function MatchesScreen() {
   };
 
   const handleAcceptMatch = () => {
-    // Generate a simulated unique code
-    const randomSuffix = Math.floor(100 + Math.random() * 900);
-    const hexPart = Math.random().toString(16).substr(2, 3).toUpperCase();
-    const code = `FM-${randomSuffix}-${hexPart}B`;
+    setShowConfirmModal(true);
+  };
+
+  const handleConfirmExchange = () => {
+    setShowConfirmModal(false);
+    
+    // Generate a simulated unique code in format FIG-XXXX-XX (e.g. FIG-8472-K9)
+    const randomNum = Math.floor(1000 + Math.random() * 9000);
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const randomChar1 = chars.charAt(Math.floor(Math.random() * chars.length));
+    const randomChar2 = chars.charAt(Math.floor(Math.random() * chars.length));
+    const code = `FIG-${randomNum}-${randomChar1}${randomChar2}`;
     
     setGeneratedCode(code);
     setModalView('code');
@@ -415,149 +442,265 @@ export default function MatchesScreen() {
           {/* Modal Header */}
           <View style={[styles.modalHeader, { backgroundColor: theme.surface, borderColor: theme.outlineVariant + '33', borderBottomWidth: 1 }]}>
             <TouchableOpacity onPress={() => setShowModal(false)} style={styles.modalBackBtn}>
-              <Ionicons name="chevron-back" size={24} color={theme.primary} />
-              <Text style={[styles.modalBackText, { color: theme.primary }]}>Volver</Text>
+              <Ionicons name="arrow-back" size={24} color={theme.primary} />
             </TouchableOpacity>
             <Text style={[styles.modalTitleText, { color: theme.onSurface }]}>
-              {modalView === 'detail' ? 'Detalle del Match' : 'Código de intercambio'}
+              {modalView === 'detail' ? 'Detalle de intercambio' : 'Código de Intercambio'}
             </Text>
-            <View style={{ width: 64 }} />
+            {modalView === 'code' ? (
+              <TouchableOpacity 
+                onPress={() => alert('Para realizar el intercambio, guardá tu figurita repetida en un sobre, escribí el código en el exterior y depositalo en el kiosco asignado. Una vez que ambos dejen su figurita, podrán retirar la suya.')} 
+                style={styles.modalHelpBtn}
+              >
+                <Ionicons name="help-circle-outline" size={24} color={theme.onSurfaceVariant} />
+              </TouchableOpacity>
+            ) : (
+              <View style={{ width: 40, marginRight: 8 }} />
+            )}
           </View>
 
           {/* Modal Content */}
           {modalView === 'detail' && selectedMatch && (
-            <ScrollView contentContainerStyle={styles.modalScroll}>
-              <View style={styles.detailCard}>
-                <Image source={{ uri: selectedMatch.avatarUrl }} style={styles.detailAvatar} />
-                <Text style={[styles.detailUserName, { color: theme.onSurface }]}>{selectedMatch.userName}</Text>
-                
-                {/* Stars */}
-                <View style={styles.detailRatingRow}>
-                  {[1, 2, 3, 4, 5].map(star => (
-                    <Text 
-                      key={star} 
-                      style={[
-                        styles.detailStar, 
-                        { color: star <= selectedMatch.reputation ? '#FF9500' : '#C7C7CC' }
-                      ]}
-                    >
-                      ★
+            <ScrollView contentContainerStyle={styles.modalScroll} showsVerticalScrollIndicator={false}>
+              {/* User Info Card */}
+              <View style={[styles.userInfoCard, { backgroundColor: theme.surfaceContainerLowest, borderColor: theme.outlineVariant }]}>
+                <View style={styles.userInfoHeader}>
+                  <Image source={{ uri: selectedMatch.avatarUrl }} style={styles.userInfoAvatar} />
+                  <View style={styles.userInfoCol}>
+                    <Text style={[styles.userInfoName, { color: theme.onSurface }]}>
+                      {selectedMatch.userName} - {selectedMatch.barrio}
                     </Text>
-                  ))}
-                  <Text style={[styles.detailTradesCount, { color: theme.onSurfaceVariant }]}>({selectedMatch.tradesCount} canjes exitosos)</Text>
-                </View>
-
-                {/* Match Exchange Box */}
-                <View style={[styles.swapContainer, { backgroundColor: theme.surfaceContainerLow, borderColor: theme.outlineVariant }]}>
-                  {/* Offered Column */}
-                  <View style={styles.swapColumn}>
-                    <View style={[styles.swapTag, { backgroundColor: scheme === 'dark' ? 'rgba(83, 225, 111, 0.15)' : 'rgba(52, 199, 89, 0.1)' }]}>
-                      <Text style={[styles.swapTagText, { color: scheme === 'dark' ? '#53e16f' : '#34C759' }]}>Ofrece</Text>
+                    <View style={styles.userInfoStars}>
+                      {[1, 2, 3, 4, 5].map(star => (
+                        <Text 
+                          key={star} 
+                          style={[
+                            styles.userInfoStar, 
+                            { color: star <= selectedMatch.reputation ? '#FF9500' : '#C7C7CC' }
+                          ]}
+                        >
+                          ★
+                        </Text>
+                      ))}
                     </View>
-                    <Text style={[styles.swapCardNumber, { color: theme.onSurface }]}>Nº {selectedMatch.offeredFigurita.number}</Text>
-                    <Text style={[styles.swapCardName, { color: theme.onSurfaceVariant }]} numberOfLines={1}>
-                      {selectedMatch.offeredFigurita.name}
-                    </Text>
-                  </View>
-
-                  {/* Divider Icon */}
-                  <View style={styles.swapDivider}>
-                    <Ionicons name="swap-horizontal" size={24} color={theme.primary} />
-                  </View>
-
-                  {/* Requested Column */}
-                  <View style={styles.swapColumn}>
-                    <View style={[styles.swapTag, { backgroundColor: scheme === 'dark' ? 'rgba(255, 184, 116, 0.15)' : 'rgba(255, 149, 0, 0.1)' }]}>
-                      <Text style={[styles.swapTagText, { color: scheme === 'dark' ? '#ffb874' : '#FF9500' }]}>Busca</Text>
-                    </View>
-                    <Text style={[styles.swapCardNumber, { color: theme.onSurface }]}>Nº {selectedMatch.requestedFigurita.number}</Text>
-                    <Text style={[styles.swapCardName, { color: theme.onSurfaceVariant }]} numberOfLines={1}>
-                      {selectedMatch.requestedFigurita.name}
-                    </Text>
                   </View>
                 </View>
-
-                {/* Exchange Location info */}
-                <View style={[styles.locationInfoBox, { backgroundColor: theme.surfaceContainerLow }]}>
-                  <Ionicons name="storefront" size={22} color={theme.primary} style={{ marginRight: 10 }} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.locationLabel, { color: theme.primary }]}>Punto de encuentro asignado</Text>
-                    <Text style={[styles.locationValName, { color: theme.onSurface }]}>{selectedMatch.kioscoNombre}</Text>
-                    <Text style={[styles.locationValAddress, { color: theme.onSurfaceVariant }]}>{selectedMatch.kioscoDireccion}</Text>
-                  </View>
-                </View>
-
-                <Text style={[styles.disclaimerText, { color: theme.onSurfaceVariant }]}>
-                  Al aceptar, se reservará un casillero seguro en este kiosco. Tenés 24 horas para entregar tu figurita.
+                <Text style={[styles.userInfoTrades, { color: theme.onSurfaceVariant }]}>
+                  {selectedMatch.tradesCount} intercambios exitosos
                 </Text>
               </View>
 
-              <View style={styles.modalBtnContainer}>
-                <Button title="Aceptar Match" onPress={handleAcceptMatch} variant="primary" />
+              {/* Proposed Exchange Section */}
+              <View style={styles.proposedSection}>
+                <Text style={[styles.proposedTitle, { color: theme.onSurface }]}>Intercambio propuesto</Text>
+                
+                <View style={styles.proposedCardsRow}>
+                  {/* Left Card: Vos entregás */}
+                  <View style={[styles.stickerCard, { backgroundColor: theme.surfaceContainerLowest, borderColor: theme.outlineVariant }]}>
+                    <View style={[styles.stickerChip, { backgroundColor: 'rgba(255, 149, 0, 0.1)' }]}>
+                      <Text style={[styles.stickerChipText, { color: '#FF9500' }]}>Repetida</Text>
+                    </View>
+                    <Text style={[styles.stickerLabel, { color: theme.onSurfaceVariant }]}>Vos entregás</Text>
+                    
+                    <View style={[styles.stickerImgContainer, { backgroundColor: theme.surfaceContainerHigh }]}>
+                      {selectedMatch.requestedFigurita.imageUrl ? (
+                        <Image source={{ uri: selectedMatch.requestedFigurita.imageUrl }} style={styles.stickerImage} />
+                      ) : (
+                        <View style={[styles.stickerFallback, { backgroundColor: theme.primary }]}>
+                          <Ionicons name="football" size={24} color="#FFFFFF" />
+                          <Text style={styles.stickerFallbackText}>FIGUMATCH</Text>
+                        </View>
+                      )}
+                    </View>
+                    
+                    <Text style={[styles.stickerNameText, { color: theme.onSurface }]}>
+                      Nº {selectedMatch.requestedFigurita.number}{'\n'}
+                      {selectedMatch.requestedFigurita.name}
+                    </Text>
+                  </View>
+
+                  {/* Swap Divider Circle */}
+                  <View style={[styles.swapDividerCircle, { backgroundColor: theme.surface, borderColor: theme.outlineVariant }]}>
+                    <Ionicons name="swap-horizontal" size={20} color={theme.outline} />
+                  </View>
+
+                  {/* Right Card: Vos recibís */}
+                  <View style={[styles.stickerCard, { backgroundColor: theme.surfaceContainerLowest, borderColor: theme.outlineVariant }]}>
+                    <View style={[styles.stickerChip, { backgroundColor: 'rgba(52, 199, 89, 0.1)' }]}>
+                      <Text style={[styles.stickerChipText, { color: '#34C759' }]}>Faltante</Text>
+                    </View>
+                    <Text style={[styles.stickerLabel, { color: theme.onSurfaceVariant }]}>Vos recibís</Text>
+                    
+                    <View style={[styles.stickerImgContainer, { backgroundColor: theme.surfaceContainerHigh }]}>
+                      {selectedMatch.offeredFigurita.imageUrl ? (
+                        <Image source={{ uri: selectedMatch.offeredFigurita.imageUrl }} style={styles.stickerImage} />
+                      ) : (
+                        <View style={[styles.stickerFallback, { backgroundColor: theme.primary }]}>
+                          <Ionicons name="football" size={24} color="#FFFFFF" />
+                          <Text style={styles.stickerFallbackText}>FIGUMATCH</Text>
+                        </View>
+                      )}
+                    </View>
+                    
+                    <Text style={[styles.stickerNameText, { color: theme.onSurface }]}>
+                      Nº {selectedMatch.offeredFigurita.number}{'\n'}
+                      {selectedMatch.offeredFigurita.name}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Bottom Spacer */}
+              <View style={{ height: 32 }} />
+
+              {/* Bottom Actions */}
+              <View style={styles.detailBottomWrapper}>
+                <TouchableOpacity 
+                  style={[styles.acceptBtn, { backgroundColor: '#34C759' }]}
+                  onPress={handleAcceptMatch}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.acceptBtnText}>Aceptar intercambio</Text>
+                </TouchableOpacity>
+                <Text style={[styles.acceptInfoText, { color: theme.onSurfaceVariant }]}>
+                  Al aceptar, se bloqueará el acuerdo y recibirás un código único.
+                </Text>
               </View>
             </ScrollView>
           )}
 
           {modalView === 'code' && selectedMatch && (
-            <ScrollView contentContainerStyle={styles.codeScrollContainer}>
-              {/* QR Code */}
-              <View style={styles.qrContainer}>
-                <QRCode
-                  value={generatedCode}
-                  size={200}
-                  color="#1C1C1E"
-                  backgroundColor="#FFFFFF"
-                />
-              </View>
-
-              {/* Code Box */}
-              <Text style={[styles.codeTextBox, { color: theme.onSurface, backgroundColor: theme.surfaceContainer }]}>{generatedCode}</Text>
-
-              {/* Instructions */}
-              <View style={styles.instructionsContainer}>
-                <View style={styles.instructionStep}>
-                  <View style={[styles.stepNumberBg, { backgroundColor: theme.primary }]}>
-                    <Text style={[styles.stepNumberText, { color: theme.onPrimary }]}>1</Text>
-                  </View>
-                  <Text style={[styles.instructionText, { color: theme.onSurfaceVariant }]}>
-                    Guardá tu figurita <Text style={[styles.boldText, { color: theme.onSurface }]}>Nº {selectedMatch.requestedFigurita.number}</Text> en un sobre y escribí el código <Text style={[styles.boldText, { color: theme.onSurface }]}>{generatedCode}</Text> afuera.
-                  </Text>
-                </View>
-                
-                <View style={styles.instructionStep}>
-                  <View style={[styles.stepNumberBg, { backgroundColor: theme.primary }]}>
-                    <Text style={[styles.stepNumberText, { color: theme.onPrimary }]}>2</Text>
-                  </View>
-                  <Text style={[styles.instructionText, { color: theme.onSurfaceVariant }]}>
-                    Llevalo a <Text style={[styles.boldText, { color: theme.onSurface }]}>{selectedMatch.kioscoNombre}</Text> ({selectedMatch.kioscoDireccion}) antes de que cierre hoy.
-                  </Text>
-                </View>
-
-                <View style={styles.instructionStep}>
-                  <View style={[styles.stepNumberBg, { backgroundColor: theme.primary }]}>
-                    <Text style={[styles.stepNumberText, { color: theme.onPrimary }]}>3</Text>
-                  </View>
-                  <Text style={[styles.instructionText, { color: theme.onSurfaceVariant }]}>
-                    <Text style={[styles.boldText, { color: theme.onSurface }]}>{selectedMatch.userName}</Text> dejará la <Text style={[styles.boldText, { color: theme.onSurface }]}>Nº {selectedMatch.offeredFigurita.number}</Text>. Te avisaremos para que pases a retirarla.
-                  </Text>
-                </View>
-              </View>
-
-              {/* Action Buttons */}
-              <View style={styles.codeButtonsContainer}>
-                <Button
-                  title="Ver en el mapa"
-                  variant="secondary"
-                  onPress={handleGoToMap}
-                />
-                <View style={{ height: spacing.md }} />
-                <Button
-                  title="Compartir código"
-                  variant="secondary"
+            <ScrollView contentContainerStyle={styles.codeScrollContainer} showsVerticalScrollIndicator={false}>
+              {/* Code & QR Card */}
+              <View style={[styles.qrCardContainer, { backgroundColor: theme.surfaceContainerLowest, borderColor: theme.outlineVariant }]}>
+                {/* Share Button (absolute positioned) */}
+                <TouchableOpacity 
+                  style={[styles.cardShareBtn, { backgroundColor: theme.surfaceContainer }]}
                   onPress={handleShare}
-                />
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="share-social-outline" size={20} color={theme.primary} />
+                </TouchableOpacity>
+
+                <Text style={[styles.qrCardLabel, { color: theme.onSurfaceVariant }]}>Tu código seguro</Text>
+                
+                {/* Code Box */}
+                <View style={[styles.codeBoxContainer, { backgroundColor: theme.surfaceContainer, borderColor: theme.outlineVariant + '44' }]}>
+                  <Text style={[styles.codeBoxText, { color: theme.onSurface }]}>{generatedCode}</Text>
+                </View>
+
+                {/* QR Code Container */}
+                <View style={[styles.qrImgContainer, { borderColor: theme.outlineVariant }]}>
+                  <QRCode
+                    value={generatedCode}
+                    size={180}
+                    color="#1b1b1d"
+                    backgroundColor="#ffffff"
+                  />
+                </View>
+
+                <Text style={[styles.qrCardCaption, { color: theme.onSurfaceVariant }]}>
+                  Mostrá este código en el punto de encuentro.
+                </Text>
+              </View>
+
+              {/* Instructions Section */}
+              <View style={styles.instructionsWrapper}>
+                <Text style={[styles.instructionsTitle, { color: theme.onSurface }]}>
+                  Instrucciones de entrega
+                </Text>
+
+                <View style={styles.instructionStepsList}>
+                  {/* Step 1 */}
+                  <View style={styles.instructionStepRow}>
+                    <View style={[styles.stepCircle, { backgroundColor: theme.primaryContainer }]}>
+                      <Text style={[styles.stepCircleText, { color: theme.onPrimaryContainer }]}>1</Text>
+                    </View>
+                    <Text style={[styles.stepText, { color: theme.onSurfaceVariant }]}>
+                      Prepará tu figurita <Text style={[styles.boldStepText, { color: theme.onSurface }]}>Nº {selectedMatch.requestedFigurita.number}</Text> en un sobre con el código <Text style={[styles.boldStepText, { color: theme.onSurface }]}>{generatedCode}</Text>.
+                    </Text>
+                  </View>
+
+                  {/* Step 2 */}
+                  <View style={styles.instructionStepRow}>
+                    <View style={[styles.stepCircle, { backgroundColor: theme.primaryContainer }]}>
+                      <Text style={[styles.stepCircleText, { color: theme.onPrimaryContainer }]}>2</Text>
+                    </View>
+                    <Text style={[styles.stepText, { color: theme.onSurfaceVariant }]}>
+                      Llevalo a <Text style={[styles.boldStepText, { color: theme.onSurface }]}>{selectedMatch.kioscoNombre}</Text> ({selectedMatch.kioscoDireccion}) antes de las 20 h.
+                    </Text>
+                  </View>
+
+                  {/* Step 3 */}
+                  <View style={styles.instructionStepRow}>
+                    <View style={[styles.stepCircle, { backgroundColor: theme.primaryContainer }]}>
+                      <Text style={[styles.stepCircleText, { color: theme.onPrimaryContainer }]}>3</Text>
+                    </View>
+                    <Text style={[styles.stepText, { color: theme.onSurfaceVariant }]}>
+                      <Text style={[styles.boldStepText, { color: theme.onSurface }]}>{selectedMatch.userName}</Text> dejará la <Text style={[styles.boldStepText, { color: theme.onSurface }]}>Nº {selectedMatch.offeredFigurita.number}</Text>. Podés retirarla desde mañana.
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Bottom Spacer to push actions down proportionally */}
+              <View style={{ height: 24 }} />
+
+              {/* Bottom Actions */}
+              <View style={styles.codeBottomWrapper}>
+                <TouchableOpacity 
+                  style={[styles.mapBtn, { borderColor: theme.primary }]}
+                  onPress={handleGoToMap}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="map-outline" size={20} color={theme.primary} style={{ marginRight: 8 }} />
+                  <Text style={[styles.mapBtnText, { color: theme.primary }]}>Ver en el mapa</Text>
+                </TouchableOpacity>
               </View>
             </ScrollView>
+          )}
+
+          {/* Confirmation Modal Overlay */}
+          {showConfirmModal && (
+            <View style={styles.confirmOverlay}>
+              <View style={[styles.confirmCard, { backgroundColor: theme.surface }]}>
+                {/* Info Icon */}
+                <View style={[styles.confirmIconBg, { backgroundColor: theme.surfaceContainerHigh }]}>
+                  <Ionicons name="information-circle" size={28} color={theme.primary} />
+                </View>
+
+                {/* Content */}
+                <View style={styles.confirmContent}>
+                  <Text style={[styles.confirmTitle, { color: theme.onSurface }]}>
+                    ¿Confirmás el intercambio?
+                  </Text>
+                  <Text style={[styles.confirmDescription, { color: theme.onSurfaceVariant }]}>
+                    Al aceptar, el acuerdo se bloquea y ya no podrá modificarse.
+                  </Text>
+                </View>
+
+                {/* Actions */}
+                <View style={styles.confirmActionsContainer}>
+                  <TouchableOpacity 
+                    style={[styles.confirmBtnConfirm, { backgroundColor: '#34C759' }]}
+                    onPress={handleConfirmExchange}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.confirmBtnConfirmText}>Sí, confirmar</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={[styles.confirmBtnCancel, { backgroundColor: theme.surfaceContainerHigh }]}
+                    onPress={() => setShowConfirmModal(false)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.confirmBtnCancelText, { color: theme.onSurfaceVariant }]}>
+                      Cancelar
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
           )}
         </ThemedView>
       </Modal>
@@ -771,10 +914,11 @@ const styles = StyleSheet.create({
     }),
   },
   modalBackBtn: {
-    flexDirection: 'row',
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingLeft: 8,
-    width: 80,
+    marginLeft: 8,
   },
   modalBackText: {
     fontSize: 16,
@@ -789,6 +933,7 @@ const styles = StyleSheet.create({
   modalScroll: {
     padding: spacing.md,
     alignItems: 'center',
+    flexGrow: 1,
   },
   detailCard: {
     width: '100%',
@@ -908,7 +1053,7 @@ const styles = StyleSheet.create({
   codeScrollContainer: {
     padding: spacing.md,
     alignItems: 'center',
-    paddingBottom: 40,
+    flexGrow: 1,
   },
   qrContainer: {
     marginTop: spacing.md,
@@ -971,5 +1116,377 @@ const styles = StyleSheet.create({
   codeButtonsContainer: {
     width: '100%',
     maxWidth: 320,
+  },
+  // New modal header support
+  modalHelpBtn: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+
+  // Detail Modal styles
+  userInfoCard: {
+    width: '100%',
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 24,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  userInfoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  userInfoAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    marginRight: 12,
+  },
+  userInfoCol: {
+    flex: 1,
+  },
+  userInfoName: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  userInfoStars: {
+    flexDirection: 'row',
+  },
+  userInfoStar: {
+    fontSize: 14,
+    marginHorizontal: 0.5,
+  },
+  userInfoTrades: {
+    fontSize: 16,
+    fontWeight: '400',
+  },
+  proposedSection: {
+    width: '100%',
+    marginBottom: 24,
+  },
+  proposedTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  proposedCardsRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    justifyContent: 'space-between',
+    width: '100%',
+    position: 'relative',
+  },
+  stickerCard: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 12,
+    alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+    marginHorizontal: 4,
+  },
+  stickerChip: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 999,
+    marginBottom: 8,
+  },
+  stickerChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  stickerLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginBottom: 10,
+  },
+  stickerImgContainer: {
+    width: 80,
+    height: 112,
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginBottom: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  stickerImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  stickerFallback: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 4,
+  },
+  stickerFallbackText: {
+    color: '#FFFFFF',
+    fontSize: 8,
+    fontWeight: 'bold',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  stickerNameText: {
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  swapDividerCircle: {
+    position: 'absolute',
+    left: '50%',
+    top: '50%',
+    marginLeft: -18,
+    marginTop: -18,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  detailBottomWrapper: {
+    width: '100%',
+    alignItems: 'center',
+    paddingBottom: 40,
+  },
+  acceptBtn: {
+    width: '100%',
+    height: 48,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 3,
+    marginBottom: 12,
+  },
+  acceptBtnText: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  acceptInfoText: {
+    fontSize: 14,
+    fontWeight: '400',
+    textAlign: 'center',
+    paddingHorizontal: 16,
+  },
+
+  // Confirmation Modal Overlay styles
+  confirmOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 50,
+    padding: 16,
+  },
+  confirmCard: {
+    width: '100%',
+    maxWidth: 330,
+    borderRadius: 24,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  confirmIconBg: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  confirmContent: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  confirmTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  confirmDescription: {
+    fontSize: 15,
+    fontWeight: '400',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  confirmActionsContainer: {
+    width: '100%',
+    gap: 12,
+  },
+  confirmBtnConfirm: {
+    width: '100%',
+    height: 50,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  confirmBtnConfirmText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  confirmBtnCancel: {
+    width: '100%',
+    height: 50,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  confirmBtnCancelText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+
+  // Code screen styles
+  qrCardContainer: {
+    width: '100%',
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    position: 'relative',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 3,
+    marginBottom: 24,
+  },
+  cardShareBtn: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  qrCardLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 12,
+  },
+  codeBoxContainer: {
+    width: '100%',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  codeBoxText: {
+    fontSize: 24,
+    fontWeight: '700',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    letterSpacing: 2,
+  },
+  qrImgContainer: {
+    borderWidth: 1,
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    marginBottom: 12,
+  },
+  qrCardCaption: {
+    fontSize: 11,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  instructionsWrapper: {
+    width: '100%',
+    marginBottom: 24,
+  },
+  instructionsTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    marginBottom: 16,
+  },
+  instructionStepsList: {
+    gap: 16,
+  },
+  instructionStepRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  stepCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  stepCircleText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  stepText: {
+    flex: 1,
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  boldStepText: {
+    fontWeight: '700',
+  },
+  codeBottomWrapper: {
+    width: '100%',
+    paddingBottom: 24,
+  },
+  mapBtn: {
+    width: '100%',
+    height: 50,
+    borderWidth: 2,
+    borderRadius: 8,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mapBtnText: {
+    fontSize: 17,
+    fontWeight: '700',
   },
 });
