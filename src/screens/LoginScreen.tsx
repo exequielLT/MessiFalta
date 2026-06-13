@@ -1,24 +1,25 @@
+import { Button } from '@/components/Button';
+import { Input } from '@/components/Input';
+import { colors } from '@/constants/theme';
+import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
-  StyleSheet,
-  View,
-  Text,
-  SafeAreaView,
-  TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  SafeAreaView,
   ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { Input } from '@/components/Input';
-import { Button } from '@/components/Button';
-import { colors } from '@/constants/theme';
 
 interface LoginScreenProps {
   onLogin: () => void;
+  onForgotPassword: () => void;
 }
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
+export const LoginScreen: React.FC<LoginScreenProps> = ({onLogin,onForgotPassword, }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -63,43 +64,42 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
               placeholder="ejemplo@correo.com"
               value={email}
               onChangeText={(text) => {
-                setEmail(text);
-                setErrorMessage('');
-              }}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
+              setEmail(text);
+              setErrorMessage('');
+           }}
+         keyboardType="email-address"
+       />
 
             <Input
-              label="Contraseña"
-              placeholder="••••••••"
-              value={password}
-              onChangeText={(text) => {
-                setPassword(text);
-                setErrorMessage('');
-              }}
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
+            label="Contraseña"
+             placeholder="••••••••"
+             value={password}
+            onChangeText={(text) => {
+            setPassword(text);
+            setErrorMessage('');
+            }}
+             secureTextEntry
+             />
 
             {errorMessage ? (
               <Text style={styles.errorText}>{errorMessage}</Text>
             ) : null}
 
             <Button
-              title="Ingresar"
-              onPress={handleLogin}
-              loading={loading}
-              style={styles.submitButton}
+             title="Ingresar"
+             onPress={handleLogin}
+             variant="primary"
+             loading={loading}
+             style={styles.submitButton}
             />
 
-            <TouchableOpacity style={styles.forgotPassword}>
-              <Text style={[styles.forgotText, { color: colors.primary }]}>
-                ¿Olvidaste tu contraseña?
-              </Text>
-            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.forgotPassword}
+              onPress={onForgotPassword}>
+            <Text style={[styles.forgotText, { color: colors.primary }]}>
+               ¿Olvidaste tu contraseña?
+             </Text>
+           </TouchableOpacity>
           </View>
 
           {/* Footer Section */}
