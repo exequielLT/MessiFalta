@@ -1,13 +1,13 @@
 import { colors } from '@/constants/theme';
 import React, { useState } from 'react';
 import {
-    ActivityIndicator,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 interface Props {
@@ -19,6 +19,7 @@ export const RecuperarContrasenaScreen: React.FC<Props> = ({ onBack }) => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [emailEnviado, setEmailEnviado] = useState(false);
 
   const handleSendEmail = () => {
     setMessage('');
@@ -31,19 +32,29 @@ export const RecuperarContrasenaScreen: React.FC<Props> = ({ onBack }) => {
 
     setLoading(true);
 
-    // Simulación de envío de correo (luego se conecta a Supabase)
     setTimeout(() => {
       setLoading(false);
-      setMessage('Revisá tu correo electrónico para recuperar tu cuenta.');
-      setEmail('');
+      setEmailEnviado(true);
+      setMessage('Te enviamos un correo. Revisá tu bandeja de entrada.');
+    }, 1200);
+  };
+
+  const handleResendEmail = () => {
+    setError('');
+    setMessage('');
+    setLoading(true);
+
+    setTimeout(() => {
+      setLoading(false);
+      setMessage('Correo reenviado correctamente.');
     }, 1200);
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-
         <Text style={styles.title}>Recuperar contraseña</Text>
+
         <Text style={styles.subtitle}>
           Ingresá tu correo y te enviaremos un enlace para restablecer tu contraseña.
         </Text>
@@ -64,11 +75,17 @@ export const RecuperarContrasenaScreen: React.FC<Props> = ({ onBack }) => {
         {error ? <Text style={styles.error}>{error}</Text> : null}
         {message ? <Text style={styles.success}>{message}</Text> : null}
 
-        <TouchableOpacity style={styles.button} onPress={handleSendEmail}>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={handleSendEmail}
+          disabled={loading}
+        >
           {loading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.buttonText}>Enviar correo</Text>
+            <Text style={styles.buttonText}>
+              {emailEnviado ? 'Reenviar correo' : 'Enviar correo'}
+            </Text>
           )}
         </TouchableOpacity>
 
@@ -77,12 +94,10 @@ export const RecuperarContrasenaScreen: React.FC<Props> = ({ onBack }) => {
             <Text style={styles.backText}>Volver al inicio de sesión</Text>
           </TouchableOpacity>
         )}
-
       </View>
     </SafeAreaView>
   );
 };
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -142,4 +157,13 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: '600',
   },
+  resendButton: {
+  marginTop: 12,
+  alignItems: 'center',
+},
+
+resendText: {
+  color: '#007AFF',
+  fontWeight: '600',
+},
 });
