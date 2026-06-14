@@ -1,24 +1,28 @@
+import { Button } from '@/components/Button';
+import { Input } from '@/components/Input';
+import { colors } from '@/constants/theme';
+import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
-  StyleSheet,
-  View,
-  Text,
-  SafeAreaView,
-  TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  SafeAreaView,
   ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { Input } from '@/components/Input';
-import { Button } from '@/components/Button';
-import { colors } from '@/constants/theme';
 
 interface LoginScreenProps {
   onLogin: () => void;
+  onForgotPassword: () => void;
 }
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
+export const LoginScreen: React.FC<LoginScreenProps> = ({
+  onLogin,
+  onForgotPassword,
+}) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -58,31 +62,27 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
 
           {/* Form Section */}
           <View style={styles.formSection}>
-            <Input
-              label="Correo electrónico"
-              placeholder="ejemplo@correo.com"
-              value={email}
-              onChangeText={(text) => {
-                setEmail(text);
-                setErrorMessage('');
-              }}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
+        <Input
+          label="Correo electrónico"
+          placeholder="ejemplo@correo.com"
+          value={email}
+          onChangeText={(text) => {
+          setEmail(text);
+          setErrorMessage('');
+         }}
+           keyboardType="email-address"
+      />
 
-            <Input
-              label="Contraseña"
-              placeholder="••••••••"
-              value={password}
-              onChangeText={(text) => {
-                setPassword(text);
-                setErrorMessage('');
-              }}
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
+          <Input
+           label="Contraseña"
+           placeholder="••••••••"
+           value={password}
+            onChangeText={(text) => {
+           setPassword(text);
+          setErrorMessage('');
+        }}
+           secureTextEntry
+     />
 
             {errorMessage ? (
               <Text style={styles.errorText}>{errorMessage}</Text>
@@ -92,14 +92,29 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
               title="Ingresar"
               onPress={handleLogin}
               loading={loading}
+              variant="primary"
               style={styles.submitButton}
-            />
+        />
+       <View style={styles.dividerContainer}>
+        <View style={styles.divider} />
+        <Text style={styles.dividerText}>o</Text>
+        <View style={styles.divider} />
+       </View>
 
-            <TouchableOpacity style={styles.forgotPassword}>
-              <Text style={[styles.forgotText, { color: colors.primary }]}>
-                ¿Olvidaste tu contraseña?
-              </Text>
-            </TouchableOpacity>
+      <Button
+        title="Continuar con Google"
+        onPress={() => console.log('Google Login')}
+        variant="secondary"
+      />
+
+           <TouchableOpacity
+             style={styles.forgotPassword}
+             onPress={onForgotPassword}
+              >
+           <Text style={[styles.forgotText, { color: colors.primary }]}>
+            ¿Olvidaste tu contraseña?
+           </Text>
+           </TouchableOpacity>
           </View>
 
           {/* Footer Section */}
@@ -197,4 +212,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
+  dividerContainer: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginVertical: 16,
+},
+divider: {
+  flex: 1,
+  height: 1,
+  backgroundColor: '#D1D1D6',
+},
+
+dividerText: {
+  marginHorizontal: 10,
+  color: '#636366',
+  fontSize: 14,
+},
 });
