@@ -9,7 +9,7 @@ import {
   Image,
   Pressable,
 } from 'react-native';
-import { useRoute, RouteProp } from '@react-navigation/native';
+import { useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@/hooks/use-theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ThemedText } from '@/components/themed-text';
@@ -17,8 +17,6 @@ import { ThemedView } from '@/components/themed-view';
 import AppHeader from '@/components/AppHeader';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { Kiosco } from '../types';
-
-type MapScreenRouteProp = RouteProp<{ params: { kioscoId?: number } }, 'params'>;
 
 const KIOSCOS_DATA: Kiosco[] = [
   { id: 1, nombre: 'Kiosco San Cayetano', direccion: 'Av. Belgrano 450',  lat: -28.468, lng: -65.782, horario: '8 a 20 h' },
@@ -82,10 +80,9 @@ export const MapScreen: React.FC<MapScreenProps> = ({ kioscoId: propKioscoId }) 
   const isDark     = colorScheme === 'dark';
 
   // Route param fallback
-  let routeParams: { kioscoId?: number } | undefined;
+  let routeParams: { kioscoId?: string } | undefined;
   try {
-    const route = useRoute<MapScreenRouteProp>();
-    routeParams = route.params;
+    routeParams = useLocalSearchParams<{ kioscoId?: string }>();
   } catch { /* no navigation context */ }
 
   const effectiveKioscoId = propKioscoId ?? (routeParams?.kioscoId ? Number(routeParams.kioscoId) : undefined);

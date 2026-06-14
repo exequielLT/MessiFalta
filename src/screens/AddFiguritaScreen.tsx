@@ -9,8 +9,8 @@ import {
   ScrollView,
   SafeAreaView
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { colors } from '../constants/theme';
@@ -21,8 +21,12 @@ import { uploadPlayerImage } from '../services/storageService';
 import { playerMapping } from '../constants/playerMapping';
 import { useAuth } from '../context/AuthContext';
 
-export const AddFiguritaScreen: React.FC = () => {
-  const navigation = useNavigation();
+interface AddFiguritaScreenProps {
+  onClose?: () => void;
+}
+
+export const AddFiguritaScreen: React.FC<AddFiguritaScreenProps> = ({ onClose }) => {
+  const router = useRouter();
   const { user } = useAuth() as any;
   const theme = useTheme();
 
@@ -156,7 +160,11 @@ export const AddFiguritaScreen: React.FC = () => {
 
       if (error) throw error;
       
-      navigation.goBack();
+      if (onClose) {
+        onClose();
+      } else {
+        router.back();
+      }
     } catch (err) {
       console.error(err);
       setErrorMessage('Error al guardar la figurita. Reintentá.');
@@ -174,7 +182,7 @@ export const AddFiguritaScreen: React.FC = () => {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <View style={[styles.header, { borderBottomColor: theme.outlineVariant }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <TouchableOpacity onPress={() => onClose ? onClose() : router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={theme.text} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: theme.text }]}>Agregar figurita</Text>
