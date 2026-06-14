@@ -19,7 +19,10 @@ interface LoginScreenProps {
   onForgotPassword: () => void;
 }
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({onLogin,onForgotPassword, }) => {
+export const LoginScreen: React.FC<LoginScreenProps> = ({
+  onLogin,
+  onForgotPassword,
+}) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -59,46 +62,58 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({onLogin,onForgotPasswor
 
           {/* Form Section */}
           <View style={styles.formSection}>
-            <Input
-              label="Correo electrónico"
-              placeholder="ejemplo@correo.com"
-              value={email}
-              onChangeText={(text) => {
-              setEmail(text);
-              setErrorMessage('');
-           }}
-         keyboardType="email-address"
-       />
+        <Input
+          label="Correo electrónico"
+          placeholder="ejemplo@correo.com"
+          value={email}
+          onChangeText={(text) => {
+          setEmail(text);
+          setErrorMessage('');
+         }}
+           keyboardType="email-address"
+      />
 
-            <Input
-            label="Contraseña"
-             placeholder="••••••••"
-             value={password}
+          <Input
+           label="Contraseña"
+           placeholder="••••••••"
+           value={password}
             onChangeText={(text) => {
-            setPassword(text);
-            setErrorMessage('');
-            }}
-             secureTextEntry
-             />
+           setPassword(text);
+          setErrorMessage('');
+        }}
+           secureTextEntry
+     />
 
             {errorMessage ? (
               <Text style={styles.errorText}>{errorMessage}</Text>
             ) : null}
 
             <Button
-             title="Ingresar"
-             onPress={handleLogin}
-             variant="primary"
-             loading={loading}
-             style={styles.submitButton}
-            />
+              title="Ingresar"
+              onPress={handleLogin}
+              loading={loading}
+              variant="primary"
+              style={styles.submitButton}
+        />
+       <View style={styles.dividerContainer}>
+        <View style={styles.divider} />
+        <Text style={styles.dividerText}>o</Text>
+        <View style={styles.divider} />
+       </View>
 
-            <TouchableOpacity
-              style={styles.forgotPassword}
-              onPress={onForgotPassword}>
-            <Text style={[styles.forgotText, { color: colors.primary }]}>
-               ¿Olvidaste tu contraseña?
-             </Text>
+      <Button
+        title="Continuar con Google"
+        onPress={() => console.log('Google Login')}
+        variant="secondary"
+      />
+
+           <TouchableOpacity
+             style={styles.forgotPassword}
+             onPress={onForgotPassword}
+              >
+           <Text style={[styles.forgotText, { color: colors.primary }]}>
+            ¿Olvidaste tu contraseña?
+           </Text>
            </TouchableOpacity>
           </View>
 
@@ -197,4 +212,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
+  dividerContainer: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginVertical: 16,
+},
+divider: {
+  flex: 1,
+  height: 1,
+  backgroundColor: '#D1D1D6',
+},
+
+dividerText: {
+  marginHorizontal: 10,
+  color: '#636366',
+  fontSize: 14,
+},
 });

@@ -9,20 +9,26 @@ import {
   ScrollView,
   SafeAreaView
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { colors } from '../constants/theme';
+import { useTheme } from '../hooks/use-theme';
 import { supabase } from '../services/supabase';
 import { searchPlayer } from '../services/api';
 import { uploadPlayerImage } from '../services/storageService';
 import { playerMapping } from '../constants/playerMapping';
 import { useAuth } from '../context/AuthContext';
 
-export const AddFiguritaScreen: React.FC = () => {
-  const navigation = useNavigation();
+interface AddFiguritaScreenProps {
+  onClose?: () => void;
+}
+
+export const AddFiguritaScreen: React.FC<AddFiguritaScreenProps> = ({ onClose }) => {
+  const router = useRouter();
   const { user } = useAuth() as any;
+  const theme = useTheme();
 
   const [numero, setNumero] = useState('');
   const [nombre, setNombre] = useState('');
@@ -154,7 +160,11 @@ export const AddFiguritaScreen: React.FC = () => {
 
       if (error) throw error;
       
-      navigation.goBack();
+      if (onClose) {
+        onClose();
+      } else {
+        router.back();
+      }
     } catch (err) {
       console.error(err);
       setErrorMessage('Error al guardar la figurita. Reintentá.');
@@ -170,17 +180,17 @@ export const AddFiguritaScreen: React.FC = () => {
   const isSaveDisabled = !numero || !!numError || !tipo;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+      <View style={[styles.header, { borderBottomColor: theme.outlineVariant }]}>
+        <TouchableOpacity onPress={() => onClose ? onClose() : router.back()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color={theme.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Agregar figurita</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>Agregar figurita</Text>
         <View style={{ width: 24 }} />
       </View>
 
       <KeyboardAvoidingView 
-        style={styles.container} 
+        style={[styles.container, { backgroundColor: theme.background }]} 
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -195,6 +205,10 @@ export const AddFiguritaScreen: React.FC = () => {
             }}
             keyboardType="number-pad"
             errorMessage={numError}
+            labelStyle={{ color: theme.textSecondary }}
+            inputContainerStyle={{ backgroundColor: theme.surfaceContainer, borderColor: theme.outlineVariant }}
+            inputStyle={{ color: theme.text }}
+            placeholderTextColor={theme.textSecondary}
           />
 
           <View style={styles.nameInputContainer}>
@@ -205,32 +219,41 @@ export const AddFiguritaScreen: React.FC = () => {
               onChangeText={handleNameChange}
               loading={searching}
               rightIcon={
-                showCheck ? <Ionicons name="checkmark-circle" size={20} color={colors.secondary} /> : undefined
+                showCheck ? <Ionicons name="checkmark-circle" size={20} color={theme.secondary} /> : undefined
               }
+              labelStyle={{ color: theme.textSecondary }}
+              inputContainerStyle={{ backgroundColor: theme.surfaceContainer, borderColor: theme.outlineVariant }}
+              inputStyle={{ color: theme.text }}
+              placeholderTextColor={theme.textSecondary}
             />
             {apiError ? (
               <View style={styles.apiErrorContainer}>
-                <Text style={styles.apiErrorText}>{apiError}</Text>
+                <Text style={[styles.apiErrorText, { color: theme.error }]}>{apiError}</Text>
                 {apiError.includes('¿Reintentar?') && (
                   <TouchableOpacity onPress={handleRetrySearch}>
-                    <Text style={styles.retryText}>Reintentar</Text>
+                    <Text style={[styles.retryText, { color: theme.primary }]}>Reintentar</Text>
                   </TouchableOpacity>
                 )}
               </View>
             ) : null}
           </View>
 
-          <Text style={styles.typeLabel}>Tipo de figurita</Text>
+          <Text style={[styles.typeLabel, { color: theme.textSecondary }]}>Tipo de figurita</Text>
           <View style={styles.typeContainer}>
             <TouchableOpacity
               style={[
                 styles.typeButton,
-                tipo === 'repetida' && { backgroundColor: colors.secondary, borderColor: colors.secondary }
+                { backgroundColor: theme.surfaceContainer, borderColor: theme.outlineVariant },
+                tipo === 'repetida' && { backgroundColor: theme.secondary, borderColor: theme.secondary }
               ]}
               onPress={() => setTipo('repetida')}
               activeOpacity={0.8}
             >
-              <Text style={[styles.typeButtonText, tipo === 'repetida' && styles.typeButtonTextActive]}>
+              <Text style={[
+                styles.typeButtonText,
+                { color: theme.text },
+                tipo === 'repetida' && { color: theme.onSecondary }
+              ]}>
                 La tengo repetida
               </Text>
             </TouchableOpacity>
@@ -238,18 +261,23 @@ export const AddFiguritaScreen: React.FC = () => {
             <TouchableOpacity
               style={[
                 styles.typeButton,
-                tipo === 'faltante' && { backgroundColor: colors.warning, borderColor: colors.warning }
+                { backgroundColor: theme.surfaceContainer, borderColor: theme.outlineVariant },
+                tipo === 'faltante' && { backgroundColor: theme.tertiary, borderColor: theme.tertiary }
               ]}
               onPress={() => setTipo('faltante')}
               activeOpacity={0.8}
             >
-              <Text style={[styles.typeButtonText, tipo === 'faltante' && styles.typeButtonTextActive]}>
+              <Text style={[
+                styles.typeButtonText,
+                { color: theme.text },
+                tipo === 'faltante' && { color: theme.onTertiary }
+              ]}>
                 La necesito
               </Text>
             </TouchableOpacity>
           </View>
 
-          {errorMessage ? <Text style={styles.mainErrorText}>{errorMessage}</Text> : null}
+          {errorMessage ? <Text style={[styles.mainErrorText, { color: theme.error }]}>{errorMessage}</Text> : null}
 
           <View style={styles.footer}>
             <Button
@@ -258,6 +286,7 @@ export const AddFiguritaScreen: React.FC = () => {
               variant="primary"
               disabled={isSaveDisabled}
               loading={saving}
+              style={{ backgroundColor: theme.primaryContainer }}
             />
           </View>
 
