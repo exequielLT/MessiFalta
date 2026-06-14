@@ -1,21 +1,22 @@
-import React, { useState, useEffect } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { CustomThemeProvider } from '@/context/theme-context';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
-import { CustomThemeProvider, useThemeContext } from '@/context/theme-context';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { StatusBar } from 'expo-status-bar';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, View } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import AppTabs from '@/components/app-tabs';
-import { OnboardingScreen } from '@/screens/OnboardingScreen';
 import { LoginScreen } from '@/screens/LoginScreen';
+import { OnboardingScreen } from '@/screens/OnboardingScreen';
+import { RecuperarContrasenaScreen } from '@/screens/RecuperarContrasenaScreen';
 
 function LayoutContent() {
   const colorScheme = useColorScheme();
   const [loading, setLoading] = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   useEffect(() => {
     const checkState = async () => {
@@ -62,19 +63,24 @@ function LayoutContent() {
   }
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-      <AnimatedSplashOverlay />
-      {showOnboarding ? (
+  <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <AnimatedSplashOverlay />
+    {showOnboarding ? (
         <OnboardingScreen onFinish={handleFinishOnboarding} />
-      ) : !isAuthenticated ? (
-        <LoginScreen onLogin={handleLogin} />
-      ) : (
-        <AppTabs />
-      )}
+       ) : showForgotPassword ? (
+    <RecuperarContrasenaScreen
+      onBack={() => setShowForgotPassword(false)} />
+       ) : !isAuthenticated ? (
+      <LoginScreen
+         onLogin={handleLogin}
+         onForgotPassword={() => setShowForgotPassword(true)}
+       />
+    ) : (
+     <AppTabs />
+  )}
     </ThemeProvider>
-  );
-}
+   );
+  }
 
 export default function TabLayout() {
   return (
