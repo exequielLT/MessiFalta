@@ -17,11 +17,13 @@ import {
 interface LoginScreenProps {
   onLogin: () => void;
   onForgotPassword: () => void;
+  onRegister: () => void;
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({
   onLogin,
   onForgotPassword,
+  onRegister,
 }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -120,11 +122,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           {/* Footer Section */}
           <View style={styles.footerSection}>
             <Text style={styles.noAccountText}>¿No tenés cuenta? </Text>
-            <TouchableOpacity>
-              <Text style={[styles.registerLinkText, { color: colors.primary }]}>
-                Registrate
-              </Text>
-            </TouchableOpacity>
+            <TouchableOpacity onPress={onRegister}>
+              <Text
+               style={[
+               styles.registerLinkText,
+                { color: colors.primary },
+               ]}
+          >
+    Registrate
+  </Text>
+</TouchableOpacity>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

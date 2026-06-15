@@ -10,6 +10,7 @@ import AppTabs from '@/components/app-tabs';
 import { LoginScreen } from '@/screens/LoginScreen';
 import { OnboardingScreen } from '@/screens/OnboardingScreen';
 import { RecuperarContrasenaScreen } from '@/screens/RecuperarContrasenaScreen';
+import { RegistrarUsuarioScreen } from '@/screens/RegistrarUsuarioScreen';
 
 function LayoutContent() {
   const colorScheme = useColorScheme();
@@ -17,6 +18,7 @@ function LayoutContent() {
   const [showOnboarding, setShowOnboarding] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [showRegister, setShowRegister] = useState(false);
 
   useEffect(() => {
     const checkState = async () => {
@@ -65,20 +67,23 @@ function LayoutContent() {
   return (
   <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
     <AnimatedSplashOverlay />
-    {showOnboarding ? (
-        <OnboardingScreen onFinish={handleFinishOnboarding} />
-       ) : showForgotPassword ? (
-    <RecuperarContrasenaScreen
-      onBack={() => setShowForgotPassword(false)} />
-       ) : !isAuthenticated ? (
-      <LoginScreen
-         onLogin={handleLogin}
-         onForgotPassword={() => setShowForgotPassword(true)}
-       />
+     {showOnboarding ? (
+      <OnboardingScreen onFinish={handleFinishOnboarding} />
+      ) : showForgotPassword ? (
+        <RecuperarContrasenaScreen
+        onBack={() => setShowForgotPassword(false)}/>
+     ) : showRegister ? (
+         <RegistrarUsuarioScreen
+           onBack={() => setShowRegister(false)}/>
+     ) : !isAuthenticated ? (
+         <LoginScreen
+           onLogin={handleLogin}
+           onForgotPassword={() => setShowForgotPassword(true)}
+           onRegister={() => setShowRegister(true)}/>
     ) : (
-     <AppTabs />
-  )}
-    </ThemeProvider>
+      <AppTabs />
+   )}
+       </ThemeProvider>
    );
   }
 
