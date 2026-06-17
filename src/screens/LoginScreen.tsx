@@ -2,7 +2,8 @@ import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
 import { colors } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '@/context/AuthContext';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -18,7 +19,6 @@ interface LoginScreenProps {
   onLogin: () => void;
   onForgotPassword: () => void;
   onRegister: () => void;
-  /** Email pre-relleno al venir desde la pantalla de Registro (usuario ya existente) */
   initialEmail?: string;
 }
 
@@ -33,8 +33,32 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const handleLogin = () => {
-    if (!email || !password) {
+  useEffect(() => {
+    if (initialEmail) {
+      setEmail(initialEmail);
+    }
+  }, [initialEmail]);
+
+  const { signIn, signInWithGoogle } = useAuth();
+
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    setErrorMessage('');
+    try {
+      await signInWithGoogle();
+      onLogin();
+    } catch (error: any) {
+      console.error(error);
+      if (error?.message && !error.message.toLowerCase().includes('cancel')) {
+        setErrorMessage(error.message || 'Error al iniciar sesión con Google.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogin = async () => {
+    if (!email.trim() || !password.trim()) {
       setErrorMessage('Por favor, completa todos los campos.');
       return;
     }
@@ -42,11 +66,22 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     setLoading(true);
     setErrorMessage('');
     
-    // Simulate API call for login
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      await signIn(email.trim(), password.trim());
       onLogin();
-    }, 1200);
+    } catch (error: any) {
+      console.error(error);
+      const msg = error?.message || '';
+      if (msg.includes('Invalid login credentials')) {
+        setErrorMessage('Email o contraseña incorrectos.');
+      } else if (msg.includes('Email not confirmed')) {
+        setErrorMessage('Por favor, confirma tu correo electrónico antes de ingresar.');
+      } else {
+        setErrorMessage(msg || 'Error al iniciar sesión.');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -108,7 +143,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
       <Button
         title="Continuar con Google"
-        onPress={() => console.log('Google Login')}
+        onPress={handleGoogleLogin}
+        loading={loading}
         variant="secondary"
       />
 

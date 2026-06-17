@@ -198,16 +198,15 @@ export default function PerfilScreen() {
   const handleLogoutConfirm = async () => {
     setLoggingOut(true);
     try {
-      // signOut() limpia AsyncStorage y setea user=null en el contexto,
-      // lo que hace que _layout.tsx re-renderice y muestre LoginScreen.
-      // No se necesita window.location.reload() (no funciona en nativo).
+      // Realizar el cierre de sesión real a través de AuthContext
       await signOut();
       setShowLogoutConfirm(false);
     } catch (e) {
       console.error('Error al cerrar sesión:', e);
+      Alert.alert('Error', 'No se pudo cerrar sesión. Intentá de nuevo.');
+    } finally {
       setLoggingOut(false);
       setShowLogoutConfirm(false);
-      Alert.alert('Error', 'No se pudo cerrar sesión. Intentá de nuevo.');
     }
   };
 

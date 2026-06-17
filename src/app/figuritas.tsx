@@ -5,6 +5,7 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { Figurita } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '@/context/AuthContext';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { Suspense, useCallback, useEffect, useState } from 'react';
 import {
@@ -75,14 +76,21 @@ export default function FiguritasScreen() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [page, setPage] = useState(1);
 
-  const loadFiguritas = useCallback(() => {
+  const { user } = useAuth() as any;
+
+  const loadFiguritas = useCallback(async () => {
+    if (!user?.id) return;
     setLoading(true);
-    // TODO: reemplazar con llamada a figuritasService.getFiguritas()
-    setTimeout(() => {
-      setFiguritas(MOCK_FIGURITAS);
+    try {
+      const { figuritasService } = await import('@/services/figuritasService');
+      const data = await figuritasService.getFiguritas(user.id);
+      setFiguritas(data);
+    } catch (error) {
+      console.error(error);
+    } finally {
       setLoading(false);
-    }, 300);
-  }, []);
+    }
+  }, [user?.id]);
 
   // Cargar datos al enfocar la pantalla (useFocusEffect para re-fetch)
   useFocusEffect(

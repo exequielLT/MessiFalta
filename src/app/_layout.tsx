@@ -1,4 +1,3 @@
-import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { CustomThemeProvider } from '@/context/theme-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -12,49 +11,39 @@ import { LoginScreen } from '@/screens/LoginScreen';
 import { OnboardingScreen } from '@/screens/OnboardingScreen';
 import { RecuperarContrasenaScreen } from '@/screens/RecuperarContrasenaScreen';
 import { RegistrarUsuarioScreen } from '@/screens/RegistrarUsuarioScreen';
+import { ActualizarContrasenaScreen } from '@/screens/ActualizarContrasenaScreen';
+import { AuthProvider, useAuth } from '@/context/AuthContext';
 
 function LayoutContent() {
   const colorScheme = useColorScheme();
-  const { user, loading: authLoading, signIn } = useAuth();
-
-  const [onboardingLoaded, setOnboardingLoaded] = useState(false);
+  const { user, loading: authLoading, isPasswordRecovery } = useAuth();
+  const [loading, setLoading] = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(true);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
-  // Email pre-relleno al ir de Registro → Login (usuario ya existente)
   const [prefilledEmail, setPrefilledEmail] = useState('');
 
   useEffect(() => {
-    const checkOnboarding = async () => {
+    const checkState = async () => {
       try {
         const hasSeenOnboarding = await AsyncStorage.getItem('has_seen_onboarding');
         if (hasSeenOnboarding === 'true') {
           setShowOnboarding(false);
         }
       } catch (error) {
-        console.error('Error reading onboarding flag:', error);
+        console.error('Error reading storage:', error);
       } finally {
-        setOnboardingLoaded(true);
+        setLoading(false);
       }
     };
-    checkOnboarding();
+    checkState();
   }, []);
 
   const handleFinishOnboarding = () => {
     setShowOnboarding(false);
   };
 
-  // Llamado por LoginScreen al confirmar login (mock MVP)
-  const handleLogin = async () => {
-    try {
-      await signIn({ id: 'mock-user-id', email: 'user@example.com' });
-    } catch (error) {
-      console.error('Error al iniciar sesión:', error);
-    }
-  };
-
-  // Mientras el contexto de auth o el flag de onboarding no cargaron
-  if (authLoading || !onboardingLoaded) {
+  if (loading || authLoading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFFFFF' }}>
         <ActivityIndicator size="large" color="#007AFF" />
@@ -65,7 +54,14 @@ function LayoutContent() {
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <AnimatedSplashOverlay />
-      {showOnboarding ? (
+      {isPasswordRecovery ? (
+        <ActualizarContrasenaScreen
+          onBackToLogin={() => {
+            setShowForgotPassword(false);
+            setShowRegister(false);
+          }}
+        />
+      ) : showOnboarding ? (
         <OnboardingScreen onFinish={handleFinishOnboarding} />
       ) : showForgotPassword ? (
         <RecuperarContrasenaScreen
@@ -75,16 +71,18 @@ function LayoutContent() {
         <RegistrarUsuarioScreen
           onBack={() => setShowRegister(false)}
           onGoToLogin={(email) => {
-            // Email ya existente: pre-rellenar login y volver
             setPrefilledEmail(email);
             setShowRegister(false);
           }}
         />
       ) : !user ? (
         <LoginScreen
-          onLogin={handleLogin}
+          onLogin={() => {}}
           onForgotPassword={() => setShowForgotPassword(true)}
-          onRegister={() => setShowRegister(true)}
+          onRegister={() => {
+            setPrefilledEmail('');
+            setShowRegister(true);
+          }}
           initialEmail={prefilledEmail}
         />
       ) : (
@@ -96,7 +94,6 @@ function LayoutContent() {
 
 export default function TabLayout() {
   return (
-    // AuthProvider envuelve todo para que useAuth() funcione en cualquier pantalla
     <AuthProvider>
       <CustomThemeProvider>
         <LayoutContent />

@@ -83,7 +83,11 @@ export const AddFiguritaScreen: React.FC<AddFiguritaScreenProps> = ({ onClose })
       try {
         const { data, error } = await searchPlayer(mapped.name);
         
-        if (error) {
+        if (error === 'RATE_LIMIT') {
+          setApiError('Demasiadas búsquedas. Esperá un minuto.');
+        } else if (error === 'NOT_FOUND') {
+          setApiError('Jugador no encontrado. Podés guardarlo sin nombre.');
+        } else if (error === 'NETWORK_ERROR' || error === 'SERVER_ERROR') {
           setApiError('No se pudo obtener la imagen. ¿Reintentar?');
         } else if (data) {
           if (!userEditedName) {
@@ -101,8 +105,6 @@ export const AddFiguritaScreen: React.FC<AddFiguritaScreenProps> = ({ onClose })
           
           setShowCheck(true);
           setTimeout(() => setShowCheck(false), 2000);
-        } else {
-          setApiError('Jugador no encontrado. Podés guardarlo sin nombre.');
         }
       } catch (err) {
         setApiError('No se pudo obtener la imagen. ¿Reintentar?');
@@ -202,9 +204,6 @@ export const AddFiguritaScreen: React.FC<AddFiguritaScreenProps> = ({ onClose })
             onChangeText={(text) => {
               const numericValue = text.replace(/[^0-9]/g, '');
               setNumero(numericValue);
-              // Resetear el flag al cambiar de número para que el autocompletado
-              // funcione correctamente con el nuevo número buscado
-              setUserEditedName(false);
             }}
             keyboardType="number-pad"
             errorMessage={numError}
