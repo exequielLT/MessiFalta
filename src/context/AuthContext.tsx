@@ -30,6 +30,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const loadSession = async () => {
       try {
+        if (typeof window !== 'undefined') {
+          const hash = window.location.hash;
+          if (hash && hash.includes('access_token')) {
+            const params = new URLSearchParams(hash.substring(1));
+            const access_token = params.get('access_token');
+            const refresh_token = params.get('refresh_token');
+            if (access_token && refresh_token) {
+              await supabase.auth.setSession({ access_token, refresh_token });
+              window.history.replaceState(null, '', window.location.pathname);
+            }
+          }
+        }
+
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
           setUser({ id: session.user.id, email: session.user.email || '' });
@@ -110,7 +123,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signInWithGoogle = async () => {
-    const redirectUrl = Linking.createURL('auth-callback');
+    const redirectUrl = Linking.createURL('');
     const isWeb = Platform.OS === 'web';
 
     const { data, error } = await supabase.auth.signInWithOAuth({

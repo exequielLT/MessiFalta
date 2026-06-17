@@ -12,17 +12,25 @@ export default function AuthCallback() {
       try {
         if (typeof window !== 'undefined') {
           const hash = window.location.hash;
-          if (hash && hash.includes('access_token')) {
+          if (hash) {
             const params = new URLSearchParams(hash.substring(1));
-            const access_token = params.get('access_token');
-            const refresh_token = params.get('refresh_token');
             
-            if (access_token && refresh_token) {
-              const { error } = await supabase.auth.setSession({ access_token, refresh_token });
-              if (error) {
-                console.error('Error setting session:', error);
-                setErrorMsg(error.message);
-                return;
+            if (params.get('error_description')) {
+              setErrorMsg(params.get('error_description') || 'Error en el login');
+              return;
+            }
+
+            if (hash.includes('access_token')) {
+              const access_token = params.get('access_token');
+              const refresh_token = params.get('refresh_token');
+              
+              if (access_token && refresh_token) {
+                const { error } = await supabase.auth.setSession({ access_token, refresh_token });
+                if (error) {
+                  console.error('Error setting session:', error);
+                  setErrorMsg(error.message);
+                  return;
+                }
               }
             }
           }
