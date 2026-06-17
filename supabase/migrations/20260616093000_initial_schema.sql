@@ -102,7 +102,12 @@ begin
 	values (
 		new.id,
 		coalesce(new.email, ''),
-		coalesce(new.raw_user_meta_data ->> 'nombre', split_part(coalesce(new.email, ''), '@', 1))
+		coalesce(
+			new.raw_user_meta_data ->> 'nombre',
+			new.raw_user_meta_data ->> 'full_name',
+			new.raw_user_meta_data ->> 'name',
+			split_part(coalesce(new.email, ''), '@', 1)
+		)
 	)
 	on conflict (id) do nothing;
 
