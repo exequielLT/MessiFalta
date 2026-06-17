@@ -11,17 +11,14 @@ import { LoginScreen } from '@/screens/LoginScreen';
 import { OnboardingScreen } from '@/screens/OnboardingScreen';
 import { RecuperarContrasenaScreen } from '@/screens/RecuperarContrasenaScreen';
 import { RegistrarUsuarioScreen } from '@/screens/RegistrarUsuarioScreen';
-import { ActualizarContrasenaScreen } from '@/screens/ActualizarContrasenaScreen';
-import { AuthProvider, useAuth } from '@/context/AuthContext';
 
 function LayoutContent() {
   const colorScheme = useColorScheme();
-  const { user, loading: authLoading, isPasswordRecovery } = useAuth();
   const [loading, setLoading] = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
-  const [prefilledEmail, setPrefilledEmail] = useState('');
 
   useEffect(() => {
     const checkState = async () => {
@@ -29,6 +26,12 @@ function LayoutContent() {
         const hasSeenOnboarding = await AsyncStorage.getItem('has_seen_onboarding');
         if (hasSeenOnboarding === 'true') {
           setShowOnboarding(false);
+        }
+        
+        // Also check for user session / login state (mock for MVP)
+        const userSession = await AsyncStorage.getItem('user_session');
+        if (userSession) {
+          setIsAuthenticated(true);
         }
       } catch (error) {
         console.error('Error reading storage:', error);
@@ -43,7 +46,17 @@ function LayoutContent() {
     setShowOnboarding(false);
   };
 
-  if (loading || authLoading) {
+  const handleLogin = async () => {
+    try {
+      await AsyncStorage.setItem('user_session', 'mock-session-id');
+      setIsAuthenticated(true);
+    } catch (error) {
+      console.error('Error writing session:', error);
+      setIsAuthenticated(true);
+    }
+  };
+
+  if (loading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFFFFF' }}>
         <ActivityIndicator size="large" color="#007AFF" />
@@ -52,52 +65,33 @@ function LayoutContent() {
   }
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
-      {isPasswordRecovery ? (
-        <ActualizarContrasenaScreen
-          onBackToLogin={() => {
-            setShowForgotPassword(false);
-            setShowRegister(false);
-          }}
-        />
-      ) : showOnboarding ? (
-        <OnboardingScreen onFinish={handleFinishOnboarding} />
+  <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <AnimatedSplashOverlay />
+     {showOnboarding ? (
+      <OnboardingScreen onFinish={handleFinishOnboarding} />
       ) : showForgotPassword ? (
         <RecuperarContrasenaScreen
-          onBack={() => setShowForgotPassword(false)}
-        />
-      ) : showRegister ? (
-        <RegistrarUsuarioScreen
-          onBack={() => setShowRegister(false)}
-          onGoToLogin={(email) => {
-            setPrefilledEmail(email);
-            setShowRegister(false);
-          }}
-        />
-      ) : !user ? (
-        <LoginScreen
-          onLogin={() => {}}
-          onForgotPassword={() => setShowForgotPassword(true)}
-          onRegister={() => {
-            setPrefilledEmail('');
-            setShowRegister(true);
-          }}
-          initialEmail={prefilledEmail}
-        />
-      ) : (
-        <AppTabs />
-      )}
-    </ThemeProvider>
-  );
-}
+        onBack={() => setShowForgotPassword(false)}/>
+     ) : showRegister ? (
+         <RegistrarUsuarioScreen
+           onBack={() => setShowRegister(false)}/>
+     ) : !isAuthenticated ? (
+         <LoginScreen
+           onLogin={handleLogin}
+           onForgotPassword={() => setShowForgotPassword(true)}
+           onRegister={() => setShowRegister(true)}/>
+    ) : (
+      <AppTabs />
+   )}
+       </ThemeProvider>
+   );
+  }
 
 export default function TabLayout() {
   return (
-    <AuthProvider>
-      <CustomThemeProvider>
-        <LayoutContent />
-      </CustomThemeProvider>
-    </AuthProvider>
+    <CustomThemeProvider>
+      <LayoutContent />
+    </CustomThemeProvider>
   );
 }
+
