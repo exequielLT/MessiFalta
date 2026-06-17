@@ -13,6 +13,7 @@ import {
 import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
 import { colors } from '@/constants/theme';
+import { useAuth } from '@/context/AuthContext';
 
 interface RegistrarUsuarioScreenProps {
   onBack?: () => void;
@@ -22,6 +23,7 @@ interface RegistrarUsuarioScreenProps {
 export const RegistrarUsuarioScreen: React.FC<
   RegistrarUsuarioScreenProps
 > = ({ onBack, onGoToLogin }) => {
+  const { signUp, signInWithGoogle } = useAuth();
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -36,7 +38,22 @@ export const RegistrarUsuarioScreen: React.FC<
     return /\S+@\S+\.\S+/.test(correo);
   };
 
-  const handleRegister = () => {
+  const handleGoogleRegister = async () => {
+    setLoading(true);
+    setErrorMessage('');
+    try {
+      await signInWithGoogle();
+    } catch (error: any) {
+      console.error(error);
+      if (error?.message && !error.message.toLowerCase().includes('cancel')) {
+        setErrorMessage(error.message || 'Error al registrarse con Google.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRegister = async () => {
     setErrorMessage('');
     setSuccessMessage('');
     setEmailYaExiste(false);
@@ -65,22 +82,25 @@ export const RegistrarUsuarioScreen: React.FC<
 
     setLoading(true);
 
-    setTimeout(() => {
-      setLoading(false);
-
-      // Simulación de email existente
-      if (email.toLowerCase() === 'usuario@correo.com') {
+    try {
+      await signUp(email, password, nombre);
+      setSuccessMessage(
+        'Registro exitoso. Revisá tu correo para verificar tu cuenta.'
+      );
+    } catch (error: any) {
+      console.error(error);
+      const isAlreadyRegistered = error?.message?.toLowerCase().includes('already registered');
+      if (isAlreadyRegistered) {
         setEmailYaExiste(true);
         setErrorMessage(
           'Ya existe una cuenta registrada con este email.'
         );
-        return;
+      } else {
+        setErrorMessage(error?.message || 'Hubo un error al registrarse. Intentalo de nuevo.');
       }
-
-      setSuccessMessage(
-        'Registro exitoso. Revisá tu correo para verificar tu cuenta.'
-      );
-    }, 1200);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -158,7 +178,8 @@ export const RegistrarUsuarioScreen: React.FC<
 
           <Button
             title="Continuar con Google"
-            onPress={() => console.log('Google Register')}
+            onPress={handleGoogleRegister}
+            loading={loading}
             variant="secondary"
           />
 
