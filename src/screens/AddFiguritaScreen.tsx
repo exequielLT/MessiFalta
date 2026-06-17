@@ -1,14 +1,13 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
-  Image,
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
   ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+  SafeAreaView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -17,8 +16,8 @@ import { Input } from '../components/Input';
 import { colors } from '../constants/theme';
 import { useTheme } from '../hooks/use-theme';
 import { searchPlayer } from '../services/api';
-import { buildPlayerImageFileName, uploadPlayerImage } from '../services/storageService';
 import { figuritasService } from '../services/figuritasService';
+import { uploadPlayerImage } from '../services/storageService';
 import { playerMapping } from '../constants/playerMapping';
 import { useAuth } from '../context/AuthContext';
 
@@ -26,32 +25,28 @@ interface AddFiguritaScreenProps {
   onClose?: () => void;
 }
 
-const formatNationality = (value?: string | null) => {
-  if (!value) return null;
-  return value.charAt(0).toUpperCase() + value.slice(1);
-};
-
 export const AddFiguritaScreen: React.FC<AddFiguritaScreenProps> = ({ onClose }) => {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user } = useAuth() as any;
   const theme = useTheme();
 
   const [numero, setNumero] = useState('');
   const [nombre, setNombre] = useState('');
   const [tipo, setTipo] = useState<'repetida' | 'faltante' | null>(null);
-  const [nacionalidad, setNacionalidad] = useState<string | null>(null);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-
+  
   const [saving, setSaving] = useState(false);
   const [searching, setSearching] = useState(false);
+  
   const [errorMessage, setErrorMessage] = useState('');
   const [apiError, setApiError] = useState('');
+  
   const [userEditedName, setUserEditedName] = useState(false);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [showCheck, setShowCheck] = useState(false);
 
   const isFirstMount = useRef(true);
-  const searchIdRef = useRef(0);
 
+  // Debounce search effect
   useEffect(() => {
     if (isFirstMount.current) {
       isFirstMount.current = false;
@@ -68,97 +63,59 @@ export const AddFiguritaScreen: React.FC<AddFiguritaScreenProps> = ({ onClose })
   }, [numero]);
 
   const handleSearch = async (numStr: string) => {
-    const currentSearchId = searchIdRef.current + 1;
-    searchIdRef.current = currentSearchId;
-
     const num = parseInt(numStr, 10);
+    
+    // Reset flags for new search
     setApiError('');
     setShowCheck(false);
-    setImageUrl(null);
-    setNacionalidad(null);
-
+    
     if (isNaN(num) || num < 1 || num > 678) {
       return;
     }
 
     const mapped = playerMapping[num];
-    if (!mapped) {
-      return;
-    }
-
-    const mappedNationality = formatNationality(mapped.seleccion);
-    setNacionalidad(mappedNationality);
-
-    if (!userEditedName) {
-      setNombre(mapped.name);
-    }
-
-    setSearching(true);
-    try {
-      const { data, error } = await searchPlayer(mapped.name);
-      if (searchIdRef.current !== currentSearchId) return;
-
-      if (error === 'RATE_LIMIT') {
-        setApiError('Demasiadas búsquedas. Esperá un minuto.');
-        return;
+    if (mapped) {
+      if (!userEditedName) {
+        setNombre(mapped.name);
       }
-
-      if (error === 'NOT_FOUND') {
-        if (!userEditedName) {
-          setNombre('');
-        }
-        setApiError('Jugador no encontrado. Podés guardarlo sin nombre.');
-        return;
-      }
-
-      if (error === 'NETWORK_ERROR' || error === 'SERVER_ERROR') {
-        setApiError('No se pudo obtener el nombre/imagen. ¿Reintentar?');
-        return;
-      }
-
-      if (data) {
-        const playerName = data.name || mapped.name;
-        const playerNationality = formatNationality(data.nationality) || mappedNationality;
-
-        if (!userEditedName) {
-          setNombre(playerName);
-        }
-        setNacionalidad(playerNationality);
-
-        if (data.photo) {
-          const fileName = buildPlayerImageFileName(num, playerName);
-          const url = await uploadPlayerImage(data.photo, fileName);
-          if (searchIdRef.current === currentSearchId) {
-            setImageUrl(url);
+      
+      setSearching(true);
+      try {
+        const { data, error } = await searchPlayer(mapped.name);
+        
+        if (error === 'RATE_LIMIT') {
+          setApiError('Demasiadas búsquedas. Esperá un minuto.');
+        } else if (error === 'NOT_FOUND') {
+          setApiError('Jugador no encontrado. Podés guardarlo sin nombre.');
+        } else if (error === 'NETWORK_ERROR' || error === 'SERVER_ERROR') {
+          setApiError('No se pudo obtener la imagen. ¿Reintentar?');
+        } else if (data) {
+          if (!userEditedName) {
+            setNombre(data.name);
           }
+          
+          if (data.photo) {
+            try {
+              const url = await uploadPlayerImage(data.photo, `${num}-${data.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.png`);
+              setImageUrl(url);
+            } catch (err) {
+              console.error('Error uploading image', err);
+            }
+          }
+          
+          setShowCheck(true);
+          setTimeout(() => setShowCheck(false), 2000);
         }
-
-        setShowCheck(true);
-        setTimeout(() => setShowCheck(false), 2000);
-      }
-    } catch (err) {
-      if (searchIdRef.current === currentSearchId) {
-        console.error(err);
-        setApiError('No se pudo obtener el nombre/imagen. ¿Reintentar?');
-      }
-    } finally {
-      if (searchIdRef.current === currentSearchId) {
+      } catch (err) {
+        setApiError('No se pudo obtener la imagen. ¿Reintentar?');
+      } finally {
         setSearching(false);
       }
+    } else {
+      if (!userEditedName) {
+        setNombre('');
+      }
     }
-  };
-
-  const handleNumberChange = (text: string) => {
-    const numericValue = text.replace(/[^0-9]/g, '');
-    searchIdRef.current += 1;
-    setNumero(numericValue);
-    setNombre('');
-    setImageUrl(null);
-    setNacionalidad(null);
-    setApiError('');
-    setErrorMessage('');
-    setSearching(false);
-    setUserEditedName(false);
   };
 
   const handleNameChange = (text: string) => {
@@ -166,9 +123,13 @@ export const AddFiguritaScreen: React.FC<AddFiguritaScreenProps> = ({ onClose })
     setUserEditedName(true);
   };
 
+  const handleRetrySearch = () => {
+    handleSearch(numero);
+  };
+
   const handleSave = async () => {
     setErrorMessage('');
-
+    
     const num = parseInt(numero, 10);
     if (isNaN(num) || num < 1 || num > 678) {
       setErrorMessage('El número debe estar entre 1 y 678');
@@ -186,16 +147,17 @@ export const AddFiguritaScreen: React.FC<AddFiguritaScreenProps> = ({ onClose })
     }
 
     setSaving(true);
+    
     try {
       await figuritasService.createFigurita({
         userId: user.id,
         numero: num,
         tipo,
-        nombreJugador: nombre.trim() || null,
+        nombreJugador: nombre,
         imagenUrl: imageUrl,
-        seleccion: nacionalidad,
+        seleccion: playerMapping[num]?.seleccion || null,
       });
-
+      
       if (onClose) {
         onClose();
       } else {
@@ -209,34 +171,36 @@ export const AddFiguritaScreen: React.FC<AddFiguritaScreenProps> = ({ onClose })
     }
   };
 
-  const parsedNumber = parseInt(numero, 10);
-  const numError = numero && (isNaN(parsedNumber) || parsedNumber < 1 || parsedNumber > 678)
-    ? 'El número debe estar entre 1 y 678'
+  const numError = numero && (parseInt(numero, 10) < 1 || parseInt(numero, 10) > 678) 
+    ? 'El número debe estar entre 1 y 678' 
     : undefined;
-  const canPreview = numero && !numError;
-  const isSaveDisabled = !numero || !!numError || !tipo || searching;
-  const selectedTypeLabel = tipo === 'repetida' ? 'Repetida' : tipo === 'faltante' ? 'Faltante' : 'Sin elegir';
+
+  const isSaveDisabled = !numero || !!numError || !tipo;
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <View style={[styles.header, { borderBottomColor: theme.outlineVariant }]}>
-        <TouchableOpacity onPress={() => (onClose ? onClose() : router.back())} style={styles.backButton}>
+        <TouchableOpacity onPress={() => onClose ? onClose() : router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={theme.text} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: theme.text }]}>Agregar figurita</Text>
         <View style={{ width: 24 }} />
       </View>
 
-      <KeyboardAvoidingView
-        style={[styles.container, { backgroundColor: theme.background }]}
+      <KeyboardAvoidingView 
+        style={[styles.container, { backgroundColor: theme.background }]} 
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          
           <Input
             label="Número de figurita"
             placeholder="Ej: 10"
             value={numero}
-            onChangeText={handleNumberChange}
+            onChangeText={(text) => {
+              const numericValue = text.replace(/[^0-9]/g, '');
+              setNumero(numericValue);
+            }}
             keyboardType="number-pad"
             errorMessage={numError}
             labelStyle={{ color: theme.textSecondary }}
@@ -247,12 +211,14 @@ export const AddFiguritaScreen: React.FC<AddFiguritaScreenProps> = ({ onClose })
 
           <View style={styles.nameInputContainer}>
             <Input
-              label="Nombre del jugador (opcional)"
+              label="Nombre del jugador (Opcional)"
               placeholder="Ej: Lionel Messi"
               value={nombre}
               onChangeText={handleNameChange}
               loading={searching}
-              rightIcon={showCheck ? <Ionicons name="checkmark-circle" size={20} color={theme.secondary} /> : undefined}
+              rightIcon={
+                showCheck ? <Ionicons name="checkmark-circle" size={20} color={theme.secondary} /> : undefined
+              }
               labelStyle={{ color: theme.textSecondary }}
               inputContainerStyle={{ backgroundColor: theme.surfaceContainer, borderColor: theme.outlineVariant }}
               inputStyle={{ color: theme.text }}
@@ -262,7 +228,7 @@ export const AddFiguritaScreen: React.FC<AddFiguritaScreenProps> = ({ onClose })
               <View style={styles.apiErrorContainer}>
                 <Text style={[styles.apiErrorText, { color: theme.error }]}>{apiError}</Text>
                 {apiError.includes('¿Reintentar?') && (
-                  <TouchableOpacity onPress={() => handleSearch(numero)} disabled={searching}>
+                  <TouchableOpacity onPress={handleRetrySearch}>
                     <Text style={[styles.retryText, { color: theme.primary }]}>Reintentar</Text>
                   </TouchableOpacity>
                 )}
@@ -276,12 +242,16 @@ export const AddFiguritaScreen: React.FC<AddFiguritaScreenProps> = ({ onClose })
               style={[
                 styles.typeButton,
                 { backgroundColor: theme.surfaceContainer, borderColor: theme.outlineVariant },
-                tipo === 'repetida' && { backgroundColor: theme.secondary, borderColor: theme.secondary },
+                tipo === 'repetida' && { backgroundColor: theme.secondary, borderColor: theme.secondary }
               ]}
               onPress={() => setTipo('repetida')}
               activeOpacity={0.8}
             >
-              <Text style={[styles.typeButtonText, { color: tipo === 'repetida' ? theme.onSecondary : theme.text }]}>
+              <Text style={[
+                styles.typeButtonText,
+                { color: theme.text },
+                tipo === 'repetida' && { color: theme.onSecondary }
+              ]}>
                 La tengo repetida
               </Text>
             </TouchableOpacity>
@@ -290,37 +260,20 @@ export const AddFiguritaScreen: React.FC<AddFiguritaScreenProps> = ({ onClose })
               style={[
                 styles.typeButton,
                 { backgroundColor: theme.surfaceContainer, borderColor: theme.outlineVariant },
-                tipo === 'faltante' && { backgroundColor: theme.tertiary, borderColor: theme.tertiary },
+                tipo === 'faltante' && { backgroundColor: theme.tertiary, borderColor: theme.tertiary }
               ]}
               onPress={() => setTipo('faltante')}
               activeOpacity={0.8}
             >
-              <Text style={[styles.typeButtonText, { color: tipo === 'faltante' ? theme.onTertiary : theme.text }]}>
+              <Text style={[
+                styles.typeButtonText,
+                { color: theme.text },
+                tipo === 'faltante' && { color: theme.onTertiary }
+              ]}>
                 La necesito
               </Text>
             </TouchableOpacity>
           </View>
-
-          {canPreview ? (
-            <View style={[styles.previewCard, { backgroundColor: theme.surfaceContainerLowest, borderColor: theme.outlineVariant }]}>
-              <Text style={[styles.previewTitle, { color: theme.text }]}>Revisá antes de guardar</Text>
-              <View style={styles.previewContent}>
-                <View style={[styles.previewImage, { backgroundColor: theme.surfaceContainerHigh }]}>
-                  {imageUrl ? (
-                    <Image source={{ uri: imageUrl }} style={styles.playerImage} resizeMode="cover" />
-                  ) : (
-                    <Ionicons name="person" size={34} color={theme.onSurfaceVariant} />
-                  )}
-                </View>
-                <View style={styles.previewInfo}>
-                  <Text style={[styles.previewName, { color: theme.text }]}>{nombre.trim() || `Figurita Nº ${numero}`}</Text>
-                  <Text style={[styles.previewMeta, { color: theme.textSecondary }]}>Número: {numero}</Text>
-                  <Text style={[styles.previewMeta, { color: theme.textSecondary }]}>Nacionalidad: {nacionalidad || 'Sin dato'}</Text>
-                  <Text style={[styles.previewMeta, { color: theme.textSecondary }]}>Tipo: {selectedTypeLabel}</Text>
-                </View>
-              </View>
-            </View>
-          ) : null}
 
           {errorMessage ? <Text style={[styles.mainErrorText, { color: theme.error }]}>{errorMessage}</Text> : null}
 
@@ -334,6 +287,7 @@ export const AddFiguritaScreen: React.FC<AddFiguritaScreenProps> = ({ onClose })
               style={{ backgroundColor: theme.primaryContainer }}
             />
           </View>
+
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -401,61 +355,22 @@ const styles = StyleSheet.create({
   },
   typeButton: {
     flex: 1,
-    minHeight: 48,
+    height: 48,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
     marginHorizontal: 4,
-    paddingHorizontal: 10,
     backgroundColor: '#FFFFFF',
   },
   typeButtonText: {
     fontSize: 14,
     fontWeight: '600',
     color: colors.textPrimary,
-    textAlign: 'center',
   },
-  previewCard: {
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 16,
-  },
-  previewTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    marginBottom: 12,
-  },
-  previewContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  previewImage: {
-    width: 76,
-    height: 76,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-    marginRight: 14,
-  },
-  playerImage: {
-    width: '100%',
-    height: '100%',
-  },
-  previewInfo: {
-    flex: 1,
-    gap: 3,
-  },
-  previewName: {
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 2,
-  },
-  previewMeta: {
-    fontSize: 13,
+  typeButtonTextActive: {
+    color: '#FFFFFF',
   },
   mainErrorText: {
     fontSize: 14,

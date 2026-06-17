@@ -1,15 +1,6 @@
 import { supabase } from './supabase';
 import { Figurita } from '../types';
 
-interface CreateFiguritaInput {
-  userId: string;
-  numero: number;
-  tipo: 'repetida' | 'faltante';
-  nombreJugador?: string | null;
-  imagenUrl?: string | null;
-  seleccion?: string | null;
-}
-
 export const figuritasService = {
   async getFiguritas(userId: string): Promise<Figurita[]> {
     const { data, error } = await supabase
@@ -26,7 +17,14 @@ export const figuritasService = {
     return data || [];
   },
 
-  async createFigurita(input: CreateFiguritaInput): Promise<Figurita> {
+  async createFigurita(input: {
+    userId: string;
+    numero: number;
+    tipo: 'repetida' | 'faltante';
+    nombreJugador?: string | null;
+    imagenUrl?: string | null;
+    seleccion?: string | null;
+  }): Promise<Figurita> {
     const { data, error } = await supabase
       .from('figuritas')
       .insert({
@@ -37,7 +35,7 @@ export const figuritasService = {
         imagen_url: input.imagenUrl || null,
         seleccion: input.seleccion || null,
       })
-      .select()
+      .select('*')
       .single();
 
     if (error) {

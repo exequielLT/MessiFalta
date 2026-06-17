@@ -1,6 +1,12 @@
 -- Kioscos base (Catamarca)
-insert into public.kioscos (nombre, direccion, latitud, longitud, activo) values
-  ('Kiosco Plaza Principal', 'San Martin y Rivadavia, Catamarca', -28.4696, -65.7801, true),
-  ('Maxikiosco El Paseo', 'Sarmiento 600, Catamarca', -28.4680, -65.7820, true),
-  ('Kiosco Universitario', 'Belgrano 300, Catamarca', -28.4650, -65.7780, true)
-on conflict do nothing;
+insert into public.kioscos (nombre, direccion, latitud, longitud, horario, activo)
+values
+  ('Kiosco San Cayetano', 'Av. Belgrano 450, San Fernando del Valle', -28.4680, -65.7820, '8 a 20 h', true),
+  ('Kiosco La Esquina', 'Rivadavia 1200, San Fernando del Valle', -28.4700, -65.7880, '9 a 21 h', true),
+  ('Kiosco Plaza', 'Sarmiento 300, San Fernando del Valle', -28.4650, -65.7800, '7 a 19 h', true)
+on conflict (nombre, direccion) do update
+set
+  latitud = excluded.latitud,
+  longitud = excluded.longitud,
+  horario = excluded.horario,
+  activo = excluded.activo;

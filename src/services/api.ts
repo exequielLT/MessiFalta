@@ -1,21 +1,13 @@
-export type SearchPlayerError = 'NOT_FOUND' | 'NETWORK_ERROR' | 'SERVER_ERROR' | 'RATE_LIMIT';
-
-export interface SearchPlayerResult {
-  name: string;
-  photo?: string;
-  nationality?: string;
-}
-
-export async function searchPlayer(name: string): Promise<{ data: SearchPlayerResult | null; error: SearchPlayerError | null }> {
+export async function searchPlayer(name: string): Promise<{ data: { name: string; photo?: string } | null; error: 'NOT_FOUND' | 'NETWORK_ERROR' | 'SERVER_ERROR' | 'RATE_LIMIT' | null }> {
   const apiKey = process.env.EXPO_PUBLIC_API_FOOTBALL_KEY;
   if (!apiKey) {
-    return {
-      data: {
-        name,
-        photo: 'https://media.api-sports.io/football/players/154.png',
-        nationality: 'Argentina',
-      },
-      error: null,
+    // If no API key, return a mock response matching messi or any player
+    return { 
+      data: { 
+        name, 
+        photo: 'https://media.api-sports.io/football/players/154.png' 
+      }, 
+      error: null 
     };
   }
 
@@ -59,7 +51,6 @@ export async function searchPlayer(name: string): Promise<{ data: SearchPlayerRe
         data: {
           name: player.name,
           photo: player.photo,
-          nationality: player.nationality,
         },
         error: null,
       };

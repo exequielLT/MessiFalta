@@ -7,6 +7,8 @@ import * as Linking from 'expo-linking';
 
 WebBrowser.maybeCompleteAuthSession();
 
+const ONBOARDING_KEY = '@onboarding_completed';
+
 interface AuthContextType {
   user: { id: string; email: string } | null;
   loading: boolean;
@@ -15,6 +17,7 @@ interface AuthContextType {
   signUp: (email: string, password: string, nombre: string) => Promise<any>;
   signIn: (email: string, password: string) => Promise<any>;
   signInWithGoogle: () => Promise<void>;
+  setSessionFromTokens: (accessToken: string, refreshToken: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -54,11 +57,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
           setUser({ id: session.user.id, email: session.user.email || '' });
-        } else {
-          const localSession = await AsyncStorage.getItem('user_session');
-          if (localSession) {
-            setUser({ id: 'mock-user-id', email: 'user@example.com' });
-          }
         }
       } catch (e) {
         console.error(e);
@@ -75,10 +73,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (session?.user) {
         setUser({ id: session.user.id, email: session.user.email || '' });
-        await AsyncStorage.setItem('user_session', session.access_token);
       } else {
         setUser(null);
-        await AsyncStorage.removeItem('user_session');
       }
       setLoading(false);
     });
@@ -186,6 +182,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (error) throw error;
   };
 
+  const setSessionFromTokens = async (accessToken: string, refreshToken: string) => {
+    const { error } = await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+    if (error) throw error;
+  };
+
   const updatePassword = async (password: string) => {
     const { error } = await supabase.auth.updateUser({ password });
     if (error) throw error;
@@ -193,8 +197,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     await supabase.auth.signOut();
-    await AsyncStorage.removeItem('user_session');
-    await AsyncStorage.removeItem('has_seen_onboarding');
+    await AsyncStorage.multiRemove([ONBOARDING_KEY, 'has_seen_onboarding']);
     setUser(null);
   };
 
@@ -208,6 +211,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signUp,
         signIn,
         signInWithGoogle,
+        setSessionFromTokens,
         resetPassword,
         updatePassword,
         signOut,
@@ -221,18 +225,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    return {
-      user: { id: 'mock-user-id', email: 'user@example.com' },
-      loading: false,
-      isPasswordRecovery: false,
-      setIsPasswordRecovery: () => {},
-      signUp: async () => {},
-      signIn: async () => {},
-      signInWithGoogle: async () => {},
-      resetPassword: async () => {},
-      updatePassword: async () => {},
-      signOut: async () => {},
-    };
+    throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
 };

@@ -8,7 +8,6 @@ import {
   Platform,
   Image,
   Pressable,
-  DimensionValue,
 } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@/hooks/use-theme';
@@ -62,7 +61,7 @@ const DARK_MAP_STYLE = [
 ];
 
 // Fixed positions on the static web map image for the 3 kioscos
-const WEB_MARKER_POSITIONS: Record<number, { top: DimensionValue; left: DimensionValue }> = {
+const WEB_MARKER_POSITIONS: Record<number, { top: `${number}%`; left: `${number}%` }> = {
   1: { top: '35%', left: '30%' },
   2: { top: '48%', left: '55%' },
   3: { top: '25%', left: '70%' },
@@ -233,11 +232,11 @@ export const MapScreen: React.FC<MapScreenProps> = ({ kioscoId: propKioscoId }) 
 
           {/* Markers */}
           {KIOSCOS_DATA.map(kiosco => {
-            const pos = WEB_MARKER_POSITIONS[kiosco.id] ?? { top: '50%', left: '50%' };
+            const pos = WEB_MARKER_POSITIONS[kiosco.id] ?? { top: '50%' as const, left: '50%' as const };
             return (
               <TouchableOpacity
                 key={kiosco.id}
-                style={[styles.markerTouch, { top: pos.top, left: pos.left }]}
+                style={[styles.markerTouch, pos]}
                 onPress={() => setSelectedKiosco(kiosco.id)}
               >
                 {renderMarker(kiosco.id === selectedKiosco)}
