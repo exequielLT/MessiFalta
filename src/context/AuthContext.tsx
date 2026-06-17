@@ -1,16 +1,22 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+interface AuthUser {
+  id: string;
+  email: string;
+}
+
 interface AuthContextType {
-  user: { id: string; email: string } | null;
+  user: AuthUser | null;
   loading: boolean;
+  signIn: (userData: AuthUser) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<{ id: string; email: string } | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -18,10 +24,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const session = await AsyncStorage.getItem('user_session');
         if (session) {
-          setUser({ id: 'mock-user-id', email: 'user@example.com' });
+          const parsed: AuthUser = JSON.parse(session);
+          setUser(parsed);
         }
       } catch (e) {
-        console.error(e);
+        console.error('Error loading session:', e);
       } finally {
         setLoading(false);
       }
@@ -29,14 +36,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loadSession();
   }, []);
 
+  const signIn = async (userData: AuthUser) => {
+    await AsyncStorage.setItem('user_session', JSON.stringify(userData));
+    setUser(userData);
+  };
+
   const signOut = async () => {
-    await AsyncStorage.removeItem('user_session');
-    await AsyncStorage.removeItem('has_seen_onboarding');
+    await AsyncStorage.multiRemove(['user_session', 'has_seen_onboarding']);
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signOut }}>
+    <AuthContext.Provider value={{ user, loading, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );
@@ -45,8 +56,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    // Return a default mock user for safety if context isn't wrapped
-    return { user: { id: 'mock-user-id', email: 'user@example.com' }, loading: false, signOut: async () => {} };
+    throw new Error('useAuth debe usarse dentro de un AuthProvider');
   }
   return context;
 };

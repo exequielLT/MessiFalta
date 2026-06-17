@@ -1,3 +1,4 @@
+import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { CustomThemeProvider } from '@/context/theme-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -14,49 +15,46 @@ import { RegistrarUsuarioScreen } from '@/screens/RegistrarUsuarioScreen';
 
 function LayoutContent() {
   const colorScheme = useColorScheme();
-  const [loading, setLoading] = useState(true);
+  const { user, loading: authLoading, signIn } = useAuth();
+
+  const [onboardingLoaded, setOnboardingLoaded] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
+  // Email pre-relleno al ir de Registro → Login (usuario ya existente)
+  const [prefilledEmail, setPrefilledEmail] = useState('');
 
   useEffect(() => {
-    const checkState = async () => {
+    const checkOnboarding = async () => {
       try {
         const hasSeenOnboarding = await AsyncStorage.getItem('has_seen_onboarding');
         if (hasSeenOnboarding === 'true') {
           setShowOnboarding(false);
         }
-        
-        // Also check for user session / login state (mock for MVP)
-        const userSession = await AsyncStorage.getItem('user_session');
-        if (userSession) {
-          setIsAuthenticated(true);
-        }
       } catch (error) {
-        console.error('Error reading storage:', error);
+        console.error('Error reading onboarding flag:', error);
       } finally {
-        setLoading(false);
+        setOnboardingLoaded(true);
       }
     };
-    checkState();
+    checkOnboarding();
   }, []);
 
   const handleFinishOnboarding = () => {
     setShowOnboarding(false);
   };
 
+  // Llamado por LoginScreen al confirmar login (mock MVP)
   const handleLogin = async () => {
     try {
-      await AsyncStorage.setItem('user_session', 'mock-session-id');
-      setIsAuthenticated(true);
+      await signIn({ id: 'mock-user-id', email: 'user@example.com' });
     } catch (error) {
-      console.error('Error writing session:', error);
-      setIsAuthenticated(true);
+      console.error('Error al iniciar sesión:', error);
     }
   };
 
-  if (loading) {
+  // Mientras el contexto de auth o el flag de onboarding no cargaron
+  if (authLoading || !onboardingLoaded) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFFFFF' }}>
         <ActivityIndicator size="large" color="#007AFF" />
@@ -65,33 +63,44 @@ function LayoutContent() {
   }
 
   return (
-  <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-    <AnimatedSplashOverlay />
-     {showOnboarding ? (
-      <OnboardingScreen onFinish={handleFinishOnboarding} />
+    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <AnimatedSplashOverlay />
+      {showOnboarding ? (
+        <OnboardingScreen onFinish={handleFinishOnboarding} />
       ) : showForgotPassword ? (
         <RecuperarContrasenaScreen
-        onBack={() => setShowForgotPassword(false)}/>
-     ) : showRegister ? (
-         <RegistrarUsuarioScreen
-           onBack={() => setShowRegister(false)}/>
-     ) : !isAuthenticated ? (
-         <LoginScreen
-           onLogin={handleLogin}
-           onForgotPassword={() => setShowForgotPassword(true)}
-           onRegister={() => setShowRegister(true)}/>
-    ) : (
-      <AppTabs />
-   )}
-       </ThemeProvider>
-   );
-  }
-
-export default function TabLayout() {
-  return (
-    <CustomThemeProvider>
-      <LayoutContent />
-    </CustomThemeProvider>
+          onBack={() => setShowForgotPassword(false)}
+        />
+      ) : showRegister ? (
+        <RegistrarUsuarioScreen
+          onBack={() => setShowRegister(false)}
+          onGoToLogin={(email) => {
+            // Email ya existente: pre-rellenar login y volver
+            setPrefilledEmail(email);
+            setShowRegister(false);
+          }}
+        />
+      ) : !user ? (
+        <LoginScreen
+          onLogin={handleLogin}
+          onForgotPassword={() => setShowForgotPassword(true)}
+          onRegister={() => setShowRegister(true)}
+          initialEmail={prefilledEmail}
+        />
+      ) : (
+        <AppTabs />
+      )}
+    </ThemeProvider>
   );
 }
 
+export default function TabLayout() {
+  return (
+    // AuthProvider envuelve todo para que useAuth() funcione en cualquier pantalla
+    <AuthProvider>
+      <CustomThemeProvider>
+        <LayoutContent />
+      </CustomThemeProvider>
+    </AuthProvider>
+  );
+}

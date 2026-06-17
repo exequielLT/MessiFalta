@@ -136,12 +136,10 @@ export default function MatchesScreen() {
     }, 1500);
   }, []);
 
-  // Simulate loading on mount
+  // Cargar matches al montar (useFocusEffect podría agregarse cuando haya datos reales)
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 1500);
-    return () => clearTimeout(timer);
+    loadMatches();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Pulse ring animation loop
@@ -231,30 +229,30 @@ export default function MatchesScreen() {
 
 
 
-  // Filter matches based on search query and active filter pill
   const filteredMatches = DUMMY_MATCHES.filter(match => {
-    // 1. Search Query
+    // 1. Búsqueda por texto — número usa .includes() para búsqueda parcial
     const query = searchQuery.toLowerCase().trim();
-    const matchesQuery = 
+    const matchesQuery =
       match.userName.toLowerCase().includes(query) ||
       match.offeredFigurita.name.toLowerCase().includes(query) ||
       match.requestedFigurita.name.toLowerCase().includes(query) ||
-      match.offeredFigurita.number.toString() === query ||
-      match.requestedFigurita.number.toString() === query;
+      match.offeredFigurita.number.toString().includes(query) ||
+      match.requestedFigurita.number.toString().includes(query);
 
     if (!matchesQuery) return false;
 
-    // 2. Filter Pills
+    // 2. Filtro por tipo de coincidencia
+    // "ofrecidas" = el otro usuario tiene una repetida que vos buscás (te da algo)
+    // "buscadas"  = el otro usuario necesita algo que vos tenés repetido (vos das)
+    // Con datos mock se simula una distribución representativa por ID:
     if (activeFilter === 'ofrecidas') {
-      // Offers matching user needs (María offers Messi etc.)
-      return true; 
+      return ['1', '3'].includes(match.id);
     }
     if (activeFilter === 'buscadas') {
-      // Seeks matching user duplicates
-      return true;
+      return ['2'].includes(match.id);
     }
 
-    return true;
+    return true; // 'todas'
   });
 
   // Render sub-views depending on screen states
