@@ -83,11 +83,7 @@ export const AddFiguritaScreen: React.FC<AddFiguritaScreenProps> = ({ onClose })
       try {
         const { data, error } = await searchPlayer(mapped.name);
         
-        if (error === 'RATE_LIMIT') {
-          setApiError('Demasiadas búsquedas. Esperá un minuto.');
-        } else if (error === 'NOT_FOUND') {
-          setApiError('Jugador no encontrado. Podés guardarlo sin nombre.');
-        } else if (error === 'NETWORK_ERROR' || error === 'SERVER_ERROR') {
+        if (error) {
           setApiError('No se pudo obtener la imagen. ¿Reintentar?');
         } else if (data) {
           if (!userEditedName) {
@@ -105,6 +101,8 @@ export const AddFiguritaScreen: React.FC<AddFiguritaScreenProps> = ({ onClose })
           
           setShowCheck(true);
           setTimeout(() => setShowCheck(false), 2000);
+        } else {
+          setApiError('Jugador no encontrado. Podés guardarlo sin nombre.');
         }
       } catch (err) {
         setApiError('No se pudo obtener la imagen. ¿Reintentar?');

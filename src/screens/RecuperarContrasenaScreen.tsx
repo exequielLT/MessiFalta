@@ -9,7 +9,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useAuth } from '@/context/AuthContext';
 
 interface Props {
   onBack?: () => void;
@@ -22,9 +21,7 @@ export const RecuperarContrasenaScreen: React.FC<Props> = ({ onBack }) => {
   const [error, setError] = useState('');
   const [emailEnviado, setEmailEnviado] = useState(false);
 
-  const { resetPassword, setIsPasswordRecovery } = useAuth();
-
-  const handleSendEmail = async () => {
+  const handleSendEmail = () => {
     setMessage('');
     setError('');
 
@@ -35,32 +32,22 @@ export const RecuperarContrasenaScreen: React.FC<Props> = ({ onBack }) => {
 
     setLoading(true);
 
-    try {
-      await resetPassword(email.trim());
+    setTimeout(() => {
+      setLoading(false);
       setEmailEnviado(true);
       setMessage('Te enviamos un correo. Revisá tu bandeja de entrada.');
-    } catch (err: any) {
-      console.error(err);
-      setError(err?.message || 'Error al enviar el correo. Por favor intentá de nuevo.');
-    } finally {
-      setLoading(false);
-    }
+    }, 1200);
   };
 
-  const handleResendEmail = async () => {
+  const handleResendEmail = () => {
     setError('');
     setMessage('');
     setLoading(true);
 
-    try {
-      await resetPassword(email.trim());
-      setMessage('Correo reenviado correctamente.');
-    } catch (err: any) {
-      console.error(err);
-      setError(err?.message || 'Error al reenviar el correo.');
-    } finally {
+    setTimeout(() => {
       setLoading(false);
-    }
+      setMessage('Correo reenviado correctamente.');
+    }, 1200);
   };
 
   return (
@@ -107,13 +94,6 @@ export const RecuperarContrasenaScreen: React.FC<Props> = ({ onBack }) => {
             <Text style={styles.backText}>Volver al inicio de sesión</Text>
           </TouchableOpacity>
         )}
-
-        <TouchableOpacity
-          onPress={() => setIsPasswordRecovery(true)}
-          style={styles.manualTokenButton}
-        >
-          <Text style={styles.manualTokenText}>Ingresar código manualmente</Text>
-        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
@@ -178,21 +158,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   resendButton: {
-    marginTop: 12,
-    alignItems: 'center',
-  },
-  resendText: {
-    color: '#007AFF',
-    fontWeight: '600',
-  },
-  manualTokenButton: {
-    marginTop: 20,
-    alignItems: 'center',
-    padding: 10,
-  },
-  manualTokenText: {
-    color: '#636366',
-    fontSize: 13,
-    textDecorationLine: 'underline',
-  },
+  marginTop: 12,
+  alignItems: 'center',
+},
+
+resendText: {
+  color: '#007AFF',
+  fontWeight: '600',
+},
 });
