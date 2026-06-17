@@ -8,6 +8,7 @@ import {
   Platform,
   Image,
   Pressable,
+  DimensionValue,
 } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@/hooks/use-theme';
@@ -61,7 +62,7 @@ const DARK_MAP_STYLE = [
 ];
 
 // Fixed positions on the static web map image for the 3 kioscos
-const WEB_MARKER_POSITIONS: Record<number, { top: string; left: string }> = {
+const WEB_MARKER_POSITIONS: Record<number, { top: DimensionValue; left: DimensionValue }> = {
   1: { top: '35%', left: '30%' },
   2: { top: '48%', left: '55%' },
   3: { top: '25%', left: '70%' },
