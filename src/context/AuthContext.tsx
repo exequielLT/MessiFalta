@@ -118,6 +118,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       options: {
         redirectTo: redirectUrl,
         skipBrowserRedirect: !isWeb,
+        queryParams: {
+          prompt: 'select_account',
+        },
       },
     });
 
