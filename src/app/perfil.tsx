@@ -21,6 +21,7 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { Button } from '@/components/Button';
 import AppHeader from '@/components/AppHeader';
+import { useAuth } from '@/context/AuthContext';
 
 // Storage keys
 const PROFILE_STORAGE_KEY = 'messifalta_user_profile';
@@ -51,6 +52,7 @@ interface TradeRecord {
 
 export default function PerfilScreen() {
   const theme = useTheme();
+  const { signOut } = useAuth();
 
   // ── State ────────────────────────────────────────────────────────────────
 
@@ -196,14 +198,11 @@ export default function PerfilScreen() {
   const handleLogoutConfirm = async () => {
     setLoggingOut(true);
     try {
-      // Clear session and onboarding flag as per AGENTS.md rules
-      await AsyncStorage.multiRemove([USER_SESSION_KEY, ONBOARDING_KEY]);
+      // signOut() limpia AsyncStorage y setea user=null en el contexto,
+      // lo que hace que _layout.tsx re-renderice y muestre LoginScreen.
+      // No se necesita window.location.reload() (no funciona en nativo).
+      await signOut();
       setShowLogoutConfirm(false);
-      // Trigger a full app reload to re-evaluate auth state in _layout.tsx
-      // For web compatibility and managed workflow
-      if (typeof window !== 'undefined') {
-        window.location.reload();
-      }
     } catch (e) {
       console.error('Error al cerrar sesión:', e);
       setLoggingOut(false);

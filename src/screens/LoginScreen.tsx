@@ -18,14 +18,17 @@ interface LoginScreenProps {
   onLogin: () => void;
   onForgotPassword: () => void;
   onRegister: () => void;
+  /** Email pre-relleno al venir desde la pantalla de Registro (usuario ya existente) */
+  initialEmail?: string;
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({
   onLogin,
   onForgotPassword,
   onRegister,
+  initialEmail = '',
 }) => {
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');

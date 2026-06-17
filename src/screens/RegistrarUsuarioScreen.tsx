@@ -80,6 +80,14 @@ export const RegistrarUsuarioScreen: React.FC<
       setSuccessMessage(
         'Registro exitoso. Revisá tu correo para verificar tu cuenta.'
       );
+      // Redirigir al login automáticamente luego del registro exitoso
+      setTimeout(() => {
+        if (onGoToLogin) {
+          onGoToLogin(email);
+        } else if (onBack) {
+          onBack();
+        }
+      }, 2000);
     }, 1200);
   };
 

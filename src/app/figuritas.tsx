@@ -6,7 +6,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { Figurita } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { Suspense, useCallback, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -73,6 +73,7 @@ export default function FiguritasScreen() {
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<FilterType>('todas');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [page, setPage] = useState(1);
 
   const loadFiguritas = useCallback(() => {
     setLoading(true);
@@ -89,6 +90,11 @@ export default function FiguritasScreen() {
       loadFiguritas();
     }, [loadFiguritas])
   );
+
+  // Resetear la página al cambiar el filtro activo
+  useEffect(() => {
+    setPage(1);
+  }, [activeFilter]);
 
   // ── Lógica de filtros ────────────────────────────────────────────────────
   const repetidas = figuritas.filter((f) => f.tipo === 'repetida');
@@ -108,8 +114,9 @@ export default function FiguritasScreen() {
     }
   })();
 
-  // Paginación de 20 figuritas
-  const displayedFiguritas = filteredFiguritas.slice(0, PAGE_SIZE);
+  // Paginación real: muestra hasta page * PAGE_SIZE figuritas
+  const displayedFiguritas = filteredFiguritas.slice(0, page * PAGE_SIZE);
+  const hasMore = filteredFiguritas.length > page * PAGE_SIZE;
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   const handleAddFigurita = () => {
@@ -272,6 +279,23 @@ export default function FiguritasScreen() {
               No hay figuritas con ese filtro.
             </ThemedText>
           </View>
+        }
+        ListFooterComponent={
+          hasMore ? (
+            <TouchableOpacity
+              onPress={() => setPage(p => p + 1)}
+              style={[
+                styles.loadMoreBtn,
+                { borderColor: theme.primary },
+              ]}
+              accessibilityLabel="Ver más figuritas"
+              accessibilityRole="button"
+            >
+              <ThemedText style={[styles.loadMoreText, { color: theme.primary }]}>
+                Ver más ({filteredFiguritas.length - page * PAGE_SIZE} restantes)
+              </ThemedText>
+            </TouchableOpacity>
+          ) : null
         }
       />
 
@@ -541,6 +565,20 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     lineHeight: 16,
+  },
+
+  // ── Ver más ────────────────────────────────────────────────────────────────
+  loadMoreBtn: {
+    alignSelf: 'center',
+    marginVertical: Spacing.three,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 999,
+    borderWidth: 1.5,
+  },
+  loadMoreText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
 
   // ── Filter empty state ────────────────────────────────────────────────────

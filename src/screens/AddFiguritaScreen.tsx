@@ -202,6 +202,9 @@ export const AddFiguritaScreen: React.FC<AddFiguritaScreenProps> = ({ onClose })
             onChangeText={(text) => {
               const numericValue = text.replace(/[^0-9]/g, '');
               setNumero(numericValue);
+              // Resetear el flag al cambiar de número para que el autocompletado
+              // funcione correctamente con el nuevo número buscado
+              setUserEditedName(false);
             }}
             keyboardType="number-pad"
             errorMessage={numError}

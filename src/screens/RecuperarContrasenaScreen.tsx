@@ -77,7 +77,7 @@ export const RecuperarContrasenaScreen: React.FC<Props> = ({ onBack }) => {
 
         <TouchableOpacity
           style={styles.button}
-          onPress={handleSendEmail}
+          onPress={emailEnviado ? handleResendEmail : handleSendEmail}
           disabled={loading}
         >
           {loading ? (
