@@ -14,9 +14,6 @@ import { RegistrarUsuarioScreen } from '@/screens/RegistrarUsuarioScreen';
 import { ActualizarContrasenaScreen } from '@/screens/ActualizarContrasenaScreen';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 
-const ONBOARDING_KEY = '@onboarding_completed';
-const LEGACY_ONBOARDING_KEY = 'has_seen_onboarding';
-
 function LayoutContent() {
   const colorScheme = useColorScheme();
   const { user, loading: authLoading, isPasswordRecovery } = useAuth();
@@ -29,12 +26,8 @@ function LayoutContent() {
   useEffect(() => {
     const checkState = async () => {
       try {
-        const hasSeenOnboarding = await AsyncStorage.getItem(LEGACY_ONBOARDING_KEY);
-        const hasCompletedOnboarding = await AsyncStorage.getItem(ONBOARDING_KEY);
-        if (hasCompletedOnboarding === 'true' || hasSeenOnboarding === 'true') {
-          if (hasSeenOnboarding === 'true' && hasCompletedOnboarding !== 'true') {
-            await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
-          }
+        const hasSeenOnboarding = await AsyncStorage.getItem('has_seen_onboarding');
+        if (hasSeenOnboarding === 'true') {
           setShowOnboarding(false);
         }
       } catch (error) {

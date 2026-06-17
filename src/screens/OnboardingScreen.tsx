@@ -14,7 +14,6 @@ import {
 } from 'react-native';
 
 const { width } = Dimensions.get('window');
-const ONBOARDING_KEY = '@onboarding_completed';
 
 interface OnboardingScreenProps {
   onFinish: () => void;
@@ -37,7 +36,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish }) 
 
   const completeOnboarding = async () => {
     try {
-      await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
+      await AsyncStorage.setItem('has_seen_onboarding', 'true');
       onFinish();
     } catch (error) {
       console.error('Error saving onboarding state:', error);

@@ -25,6 +25,9 @@ import { useAuth } from '@/context/AuthContext';
 
 // Storage keys
 const PROFILE_STORAGE_KEY = 'messifalta_user_profile';
+const USER_SESSION_KEY = 'user_session';
+const ONBOARDING_KEY = 'has_seen_onboarding';
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface UserProfile {
