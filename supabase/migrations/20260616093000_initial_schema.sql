@@ -150,6 +150,7 @@ execute procedure public.set_updated_at();
 -- ---------------------------------------------------------------------------
 -- Optional helper for anonymous-safe figuritas listing
 -- ---------------------------------------------------------------------------
+drop function if exists public.get_anonymous_figuritas();
 create or replace function public.get_anonymous_figuritas()
 returns table (
 	id bigint,
