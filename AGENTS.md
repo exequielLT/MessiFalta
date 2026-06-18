@@ -17,7 +17,7 @@ MVP con autenticación Supabase, base de datos real, almacenamiento de imágenes
 
 ## 📚 Stack
 - **Lenguaje:** TypeScript (strict mode)
-- **Framework:** React Native con Expo (managed workflow, SDK 52+)
+- **Framework:** React Native con Expo (managed workflow, SDK 56+)
 - **Backend/BD:** Supabase (PostgreSQL + Auth + Storage)
 - **Herramientas:** MCP de Supabase para gestión de base de datos, autenticación y storage.
 - **Navegación:** React Navigation v6 (RootStack modal + AuthStack + BottomTabs)
