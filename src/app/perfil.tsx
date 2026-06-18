@@ -11,8 +11,10 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   Text,
+  Image,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ThemedText } from '@/components/themed-text';
@@ -37,6 +39,7 @@ interface UserProfile {
   location: string;
   rating: number;
   totalTrades: number;
+  avatarUrl?: string;
 }
 
 interface TradeRecord {
@@ -110,6 +113,7 @@ export default function PerfilScreen() {
             setUserProfile((prev) => ({
               ...prev,
               location: parsed.location || prev.location,
+              avatarUrl: parsed.avatarUrl || prev.avatarUrl,
             }));
           }
         } catch (e) {
@@ -144,6 +148,7 @@ export default function PerfilScreen() {
         name: editName.trim(),
         location: editLocation.trim(),
         email: userProfile.email,
+        avatarUrl: userProfile.avatarUrl,
       };
 
       if (user?.id) {
@@ -179,8 +184,30 @@ export default function PerfilScreen() {
     Alert.alert('Historial Completo', 'El historial detallado estará disponible próximamente.');
   };
 
-  const handleAvatarPress = () => {
-    Alert.alert('Subir Foto', 'La carga de imágenes estará disponible en la versión final.');
+  const handleAvatarPress = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (permissionResult.granted === false) {
+        Alert.alert('Permiso denegado', 'Necesitás dar permiso para acceder a tus fotos.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.5,
+      });
+
+      if (!result.canceled && result.assets && result.assets[0].uri) {
+        const newAvatarUrl = result.assets[0].uri;
+        const updatedProfile = { ...userProfile, avatarUrl: newAvatarUrl };
+        await AsyncStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(updatedProfile));
+        setUserProfile(updatedProfile);
+      }
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'No se pudo cargar la imagen.');
+    }
   };
 
   const handleLogoutConfirm = async () => {
@@ -250,8 +277,12 @@ export default function PerfilScreen() {
             onPress={handleAvatarPress}
             style={({ pressed }) => [pressed && styles.pressed]}
           >
-            <View style={[styles.avatarContainer, { backgroundColor: theme.surfaceContainerHigh }]}>
-              <Ionicons name="person" size={44} color={theme.onSurfaceVariant} />
+            <View style={[styles.avatarContainer, { backgroundColor: theme.surfaceContainerHigh, overflow: 'hidden' }]}>
+              {userProfile.avatarUrl ? (
+                <Image source={{ uri: userProfile.avatarUrl }} style={{ width: '100%', height: '100%' }} />
+              ) : (
+                <Ionicons name="person" size={44} color={theme.onSurfaceVariant} />
+              )}
             </View>
           </Pressable>
 
@@ -458,8 +489,12 @@ export default function PerfilScreen() {
                 onPress={handleAvatarPress}
                 style={({ pressed }) => [styles.avatarWrapper, pressed && styles.pressed]}
               >
-                <View style={[styles.avatarContainerLarge, { backgroundColor: theme.surfaceContainerHigh }]}>
-                  <Ionicons name="person" size={54} color={theme.onSurfaceVariant} />
+                <View style={[styles.avatarContainerLarge, { backgroundColor: theme.surfaceContainerHigh, overflow: 'hidden' }]}>
+                  {userProfile.avatarUrl ? (
+                    <Image source={{ uri: userProfile.avatarUrl }} style={{ width: '100%', height: '100%' }} />
+                  ) : (
+                    <Ionicons name="person" size={54} color={theme.onSurfaceVariant} />
+                  )}
                 </View>
                 <View style={[styles.editBadge, { backgroundColor: theme.primary }]}>
                   <Ionicons name="camera" size={16} color={theme.onPrimary} />
