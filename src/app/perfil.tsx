@@ -145,6 +145,15 @@ export default function PerfilScreen() {
         location: editLocation.trim(),
         email: userProfile.email,
       };
+
+      if (user?.id) {
+        const { error } = await supabase
+          .from('profiles')
+          .update({ nombre: editName.trim() })
+          .eq('id', user.id);
+          
+        if (error) throw error;
+      }
       await AsyncStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(updatedProfile));
       setUserProfile((prev) => ({ ...prev, ...updatedProfile }));
       setIsEditModalVisible(false);
