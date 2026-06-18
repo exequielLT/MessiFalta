@@ -19,7 +19,6 @@ import { useTheme } from '../hooks/use-theme';
 import { searchPlayer } from '../services/api';
 import { buildPlayerImageFileName, uploadPlayerImage } from '../services/storageService';
 import { figuritasService } from '../services/figuritasService';
-import { playerMapping } from '../constants/playerMapping';
 import { useAuth } from '@/context/AuthContext';
 
 interface AddFiguritaScreenProps {
@@ -31,22 +30,33 @@ const formatNationality = (value?: string | null) => {
   return value.charAt(0).toUpperCase() + value.slice(1);
 };
 
+// Se genera un numero deterministico en base al nombre del jugador
+// Así evitamos tener que pedirle el número al usuario y mantenemos
+// la compatibilidad con el sistema de Matchmaking (que requiere un numero del 1 al 678)
+const generateNumberFromName = (name: string): number => {
+  let hash = 0;
+  const str = name.toLowerCase().trim();
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return (Math.abs(hash) % 678) + 1;
+};
+
 export const AddFiguritaScreen: React.FC<AddFiguritaScreenProps> = ({ onClose }) => {
   const router = useRouter();
   const { user } = useAuth();
   const theme = useTheme();
 
-  const [numero, setNumero] = useState('');
   const [nombre, setNombre] = useState('');
   const [tipo, setTipo] = useState<'repetida' | 'faltante' | null>(null);
-  const [nacionalidad, setNacionalidad] = useState<string | null>(null);
+  const [nacionalidad, setNacionalidad] = useState('');
   const [imageUrl, setImageUrl] = useState<string | null>(null);
 
   const [saving, setSaving] = useState(false);
   const [searching, setSearching] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [apiError, setApiError] = useState('');
-  const [userEditedName, setUserEditedName] = useState(false);
   const [showCheck, setShowCheck] = useState(false);
 
   const isFirstMount = useRef(true);
@@ -59,43 +69,24 @@ export const AddFiguritaScreen: React.FC<AddFiguritaScreenProps> = ({ onClose })
     }
 
     const handler = setTimeout(() => {
-      if (numero) {
-        handleSearch(numero);
+      if (nombre.trim().length >= 3) {
+        handleSearch(nombre.trim());
       }
     }, 800);
 
     return () => clearTimeout(handler);
-  }, [numero]);
+  }, [nombre]);
 
-  const handleSearch = async (numStr: string) => {
+  const handleSearch = async (nameStr: string) => {
     const currentSearchId = searchIdRef.current + 1;
     searchIdRef.current = currentSearchId;
 
-    const num = parseInt(numStr, 10);
     setApiError('');
     setShowCheck(false);
-    setImageUrl(null);
-    setNacionalidad(null);
-
-    if (isNaN(num) || num < 1 || num > 678) {
-      return;
-    }
-
-    const mapped = playerMapping[num];
-    if (!mapped) {
-      return;
-    }
-
-    const mappedNationality = formatNationality(mapped.seleccion);
-    setNacionalidad(mappedNationality);
-
-    if (!userEditedName) {
-      setNombre(mapped.name);
-    }
 
     setSearching(true);
     try {
-      const { data, error } = await searchPlayer(mapped.name);
+      const { data, error } = await searchPlayer(nameStr);
       if (searchIdRef.current !== currentSearchId) return;
 
       if (error === 'RATE_LIMIT') {
@@ -104,29 +95,23 @@ export const AddFiguritaScreen: React.FC<AddFiguritaScreenProps> = ({ onClose })
       }
 
       if (error === 'NOT_FOUND') {
-        if (!userEditedName) {
-          setNombre('');
-        }
-        setApiError('Jugador no encontrado. Podés guardarlo sin nombre.');
+        setApiError('Jugador no encontrado. Podés guardarlo igual.');
         return;
       }
 
       if (error === 'NETWORK_ERROR' || error === 'SERVER_ERROR') {
-        setApiError('No se pudo obtener el nombre/imagen. ¿Reintentar?');
+        setApiError('No se pudo buscar en la API. ¿Reintentar?');
         return;
       }
 
       if (data) {
-        const playerName = data.name || mapped.name;
-        const playerNationality = formatNationality(data.nationality) || mappedNationality;
-
-        if (!userEditedName) {
-          setNombre(playerName);
+        if (data.nationality) {
+          setNacionalidad(formatNationality(data.nationality) || '');
         }
-        setNacionalidad(playerNationality);
 
         if (data.photo) {
-          const fileName = buildPlayerImageFileName(num, playerName);
+          const generatedNum = generateNumberFromName(data.name || nameStr);
+          const fileName = buildPlayerImageFileName(generatedNum, data.name || nameStr);
           const url = await uploadPlayerImage(data.photo, fileName);
           if (searchIdRef.current === currentSearchId) {
             setImageUrl(url);
@@ -139,7 +124,7 @@ export const AddFiguritaScreen: React.FC<AddFiguritaScreenProps> = ({ onClose })
     } catch (err) {
       if (searchIdRef.current === currentSearchId) {
         console.error(err);
-        setApiError('No se pudo obtener el nombre/imagen. ¿Reintentar?');
+        setApiError('No se pudo buscar en la API. ¿Reintentar?');
       }
     } finally {
       if (searchIdRef.current === currentSearchId) {
@@ -148,30 +133,25 @@ export const AddFiguritaScreen: React.FC<AddFiguritaScreenProps> = ({ onClose })
     }
   };
 
-  const handleNumberChange = (text: string) => {
-    const numericValue = text.replace(/[^0-9]/g, '');
+  const handleNameChange = (text: string) => {
+    setNombre(text);
     searchIdRef.current += 1;
-    setNumero(numericValue);
-    setNombre('');
-    setImageUrl(null);
-    setNacionalidad(null);
     setApiError('');
     setErrorMessage('');
     setSearching(false);
-    setUserEditedName(false);
-  };
-
-  const handleNameChange = (text: string) => {
-    setNombre(text);
-    setUserEditedName(true);
+    setShowCheck(false);
   };
 
   const handleSave = async () => {
     setErrorMessage('');
 
-    const num = parseInt(numero, 10);
-    if (isNaN(num) || num < 1 || num > 678) {
-      setErrorMessage('El número debe estar entre 1 y 678');
+    if (!nombre.trim()) {
+      setErrorMessage('Ingresá el nombre del jugador');
+      return;
+    }
+
+    if (!nacionalidad.trim()) {
+      setErrorMessage('Ingresá la nacionalidad');
       return;
     }
 
@@ -185,15 +165,17 @@ export const AddFiguritaScreen: React.FC<AddFiguritaScreenProps> = ({ onClose })
       return;
     }
 
+    const generatedNum = generateNumberFromName(nombre);
+
     setSaving(true);
     try {
       await figuritasService.createFigurita({
         userId: user.id,
-        numero: num,
+        numero: generatedNum,
         tipo,
-        nombreJugador: nombre.trim() || null,
+        nombreJugador: nombre.trim(),
         imagenUrl: imageUrl,
-        seleccion: nacionalidad,
+        seleccion: nacionalidad.trim(),
       });
 
       if (onClose) {
@@ -209,12 +191,8 @@ export const AddFiguritaScreen: React.FC<AddFiguritaScreenProps> = ({ onClose })
     }
   };
 
-  const parsedNumber = parseInt(numero, 10);
-  const numError = numero && (isNaN(parsedNumber) || parsedNumber < 1 || parsedNumber > 678)
-    ? 'El número debe estar entre 1 y 678'
-    : undefined;
-  const canPreview = numero && !numError;
-  const isSaveDisabled = !numero || !!numError || !tipo || searching;
+  const canPreview = nombre.trim().length > 0;
+  const isSaveDisabled = !nombre.trim() || !nacionalidad.trim() || !tipo || searching;
   const selectedTypeLabel = tipo === 'repetida' ? 'Repetida' : tipo === 'faltante' ? 'Faltante' : 'Sin elegir';
 
   return (
@@ -232,22 +210,9 @@ export const AddFiguritaScreen: React.FC<AddFiguritaScreenProps> = ({ onClose })
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-          <Input
-            label="Número de figurita"
-            placeholder="Ej: 10"
-            value={numero}
-            onChangeText={handleNumberChange}
-            keyboardType="number-pad"
-            errorMessage={numError}
-            labelStyle={{ color: theme.textSecondary }}
-            inputContainerStyle={{ backgroundColor: theme.surfaceContainer, borderColor: theme.outlineVariant }}
-            inputStyle={{ color: theme.text }}
-            placeholderTextColor={theme.textSecondary}
-          />
-
           <View style={styles.nameInputContainer}>
             <Input
-              label="Nombre del jugador (opcional)"
+              label="Nombre del jugador"
               placeholder="Ej: Lionel Messi"
               value={nombre}
               onChangeText={handleNameChange}
@@ -262,13 +227,24 @@ export const AddFiguritaScreen: React.FC<AddFiguritaScreenProps> = ({ onClose })
               <View style={styles.apiErrorContainer}>
                 <Text style={[styles.apiErrorText, { color: theme.error }]}>{apiError}</Text>
                 {apiError.includes('¿Reintentar?') && (
-                  <TouchableOpacity onPress={() => handleSearch(numero)} disabled={searching}>
+                  <TouchableOpacity onPress={() => handleSearch(nombre)} disabled={searching}>
                     <Text style={[styles.retryText, { color: theme.primary }]}>Reintentar</Text>
                   </TouchableOpacity>
                 )}
               </View>
             ) : null}
           </View>
+
+          <Input
+            label="Nacionalidad"
+            placeholder="Ej: Argentina"
+            value={nacionalidad}
+            onChangeText={setNacionalidad}
+            labelStyle={{ color: theme.textSecondary }}
+            inputContainerStyle={{ backgroundColor: theme.surfaceContainer, borderColor: theme.outlineVariant, marginBottom: 16 }}
+            inputStyle={{ color: theme.text }}
+            placeholderTextColor={theme.textSecondary}
+          />
 
           <Text style={[styles.typeLabel, { color: theme.textSecondary }]}>Tipo de figurita</Text>
           <View style={styles.typeContainer}>
@@ -313,8 +289,7 @@ export const AddFiguritaScreen: React.FC<AddFiguritaScreenProps> = ({ onClose })
                   )}
                 </View>
                 <View style={styles.previewInfo}>
-                  <Text style={[styles.previewName, { color: theme.text }]}>{nombre.trim() || `Figurita Nº ${numero}`}</Text>
-                  <Text style={[styles.previewMeta, { color: theme.textSecondary }]}>Número: {numero}</Text>
+                  <Text style={[styles.previewName, { color: theme.text }]}>{nombre.trim()}</Text>
                   <Text style={[styles.previewMeta, { color: theme.textSecondary }]}>Nacionalidad: {nacionalidad || 'Sin dato'}</Text>
                   <Text style={[styles.previewMeta, { color: theme.textSecondary }]}>Tipo: {selectedTypeLabel}</Text>
                 </View>
