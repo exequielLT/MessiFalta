@@ -15,12 +15,12 @@ returns table (
 	requested_name text,
 	requested_image_url text,
 	distance text,
-	kiosco_id bigint,
+	kiosco_id uuid,
 	kiosco_nombre text,
 	kiosco_direccion text,
 	barrio text,
-    figurita_mia_id bigint,
-    figurita_ajena_id bigint
+    figurita_mia_id uuid,
+    figurita_ajena_id uuid
 )
 language sql
 security definer
@@ -39,7 +39,7 @@ as $$
 		f_mia_rep.nombre_jugador as requested_name,
 		f_mia_rep.imagen_url as requested_image_url,
 		'Kiosco a calcular' as distance,
-		1 as kiosco_id,
+		null::uuid as kiosco_id,
 		'Kiosco por asignar' as kiosco_nombre,
 		'Dirección pendiente' as kiosco_direccion,
 		'Barrio pendiente' as barrio,
@@ -64,15 +64,15 @@ grant execute on function public.find_potential_matches() to authenticated;
 
 
 -- 2. create_match_request: Safely inserts into matches table
-create or replace function public.create_match_request(p_figurita_mia_id bigint, p_figurita_ajena_id bigint)
-returns bigint
+create or replace function public.create_match_request(p_figurita_mia_id uuid, p_figurita_ajena_id uuid)
+returns uuid
 language plpgsql
 security definer
 set search_path = public
 as $$
 declare
 	v_user_b uuid;
-	v_match_id bigint;
+	v_match_id uuid;
 begin
 	-- Get the owner of the other figurita safely
 	select user_id into v_user_b
@@ -92,5 +92,5 @@ begin
 end;
 $$;
 
-revoke all on function public.create_match_request(bigint, bigint) from public;
-grant execute on function public.create_match_request(bigint, bigint) to authenticated;
+revoke all on function public.create_match_request(uuid, uuid) from public;
+grant execute on function public.create_match_request(uuid, uuid) to authenticated;
