@@ -28,79 +28,8 @@ import QRCode from 'react-native-qrcode-svg';
 const cloudLightningIcon = require('../../assets/images/matches/Cloud-Lightning-Icon.png');
 const emptySearchIcon = require('../../assets/images/matches/img-busqueda-vacia.png');
 
-interface FiguritaDetail {
-  number: number;
-  name: string;
-  imageUrl?: string;
-}
-
-interface MatchInfo {
-  id: string;
-  userName: string;
-  avatarUrl: string;
-  reputation: number;
-  tradesCount: number;
-  offeredFigurita: FiguritaDetail;
-  requestedFigurita: FiguritaDetail;
-  distance: string;
-  kioscoId: number;
-  kioscoNombre: string;
-  kioscoDireccion: string;
-  barrio: string;
-}
-
-const DUMMY_MATCHES: MatchInfo[] = [
-  {
-    id: '1',
-    userName: 'María',
-    avatarUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuA1tl8OM8e9-ifhgYdCB4f6DE3LPOq3CwIzQjuWA_4sQt5B-GXbOY55dOzlr089DewzxLfVdCr6V-srgOn7vWr9gLC-I5fYXAF-lHwLJ-E56rD6crSSrsPj6zrsKooxLQuHzaUBCuzeySyBCX5SR1wY3Y_PtKbJ6TGVq_4GEmn3tQTZaq9IKGcWrhA5jKkuq1Pjwrb1uNcKPEh2JNfjt6PF3pEGOKKttRA0G-dU66zn_0tlciHWmtgoFJJfVNUvN6eHU5aIihQkHKfs',
-    reputation: 4,
-    tradesCount: 12,
-    offeredFigurita: { 
-      number: 200, 
-      name: 'Lionel Messi',
-      imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuA2lW5nE-CCDfNshcaCoJQ5fAAKeOURw1XEmCaOZeH-1NEwPHaWeVypUCt6F44ITkD521Zq4BuVy3lJ9acArQsun9CnHk47xluyJJY6bM2O37J-Ghcg28v-cQemkwBwEjGPsdS4lu-cl4ghjb5f9lUmSZ36Hr5zCxfm1iDB_ROscdvhiWRuZcxX99-dscH48ttbBS4JA3Vv5k-8TqibfYyrY9D3DsoQQFuJ4lPEkZKze6iHQZ9g2Q3hC3juZooiWaCFSdqcAGr-9ySk'
-    },
-    requestedFigurita: { 
-      number: 89, 
-      name: 'Julián Álvarez',
-      imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBWNcxBL0mj4v8zkPnVIILx6HUePmjCztaXOSP6_KJFkcpLrtRNU-OEQtp5E4eGUJI3TevSGNQ4-SC-tyPpoZ7zgWsvdAt47YJnERPQkXApGSPoryyBQy2J2JdW52__fmaAlNeLgKs394BY1-Nz89IKRlMRNBfvq6p6AZWc03ODJir_fvCPb8n7Mo7dWfwwoe4M4ixQKTB_NOg1w8CbRdIlZPwQB-aEZJG9v2PRPwlIkGiwSGkcCG_JlPJeM7OabvB8UzpD4zaLEQBD'
-    },
-    distance: 'Kiosco a 300 m',
-    kioscoId: 1,
-    kioscoNombre: 'Kiosco San Cayetano',
-    kioscoDireccion: 'Av. Belgrano 450',
-    barrio: 'Barrio Centro',
-  },
-  {
-    id: '2',
-    userName: 'Juan',
-    avatarUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBD5VQKt0MBiJBA4W84bu5DeO7s9WezgwYvvdvDy28GuoQN_MRgyNnlSvcZ0x1zJPzsvC93rpT6wYLqcfQEGlm31Lv2k9unLk093zd481hSPQfMGXrB3GwCA0eyRFFRXvv2U9yc5FeQ9_L20GKmnnW7ZCeSraDkr0asJSaM-1Ttl-hhPjzDMQA9tlhwea7d4JF-WQ96mSMmlRDAkfiWM4OI1pLej8QSy4wsyNt4er93Irk8Bz7y-f52P8ijfwUd8Y0ZJLWizVyQJlPj',
-    reputation: 5,
-    tradesCount: 8,
-    offeredFigurita: { number: 12, name: 'Emiliano Martínez' },
-    requestedFigurita: { number: 10, name: 'Lautaro Martínez' },
-    distance: 'Kiosco a 450 m',
-    kioscoId: 2,
-    kioscoNombre: 'Parada Sur',
-    kioscoDireccion: 'Rivadavia 1200',
-    barrio: 'Barrio Sur',
-  },
-  {
-    id: '3',
-    userName: 'Elena',
-    avatarUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuASq3tExIEwfq1hvU-vk-WlVoKg7KGjMWVh6aLb_zdT8Ndr0_vAXGOUjxM9NlQ4_Yb4dGd7yQoAHClbSggRwXA2uhsJc04O7eLrgHua1UC9HhjESGCUJbTJYFXsJWGTnvNONhPsz5vyfHyh9I20dJwLr9NlpVlxk76ARAe_AIRZwxxDgJk0gsjWYwDkGkJQ61yMCW824IeVMFQZfTu7l10LiCLV3knVKiWKoEnvcfnw7ScsnOAja0lu3pZTVkCwJ55EgZYQk9sF-uHY',
-    reputation: 3,
-    tradesCount: 5,
-    offeredFigurita: { number: 158, name: 'Rodrigo De Paul' },
-    requestedFigurita: { number: 200, name: 'Lionel Messi' },
-    distance: 'Kiosco a 1.2 km',
-    kioscoId: 3,
-    kioscoNombre: 'Kiosquito Norte',
-    kioscoDireccion: 'Belgrano 250',
-    barrio: 'Barrio Norte',
-  },
-];
+import { useAuth } from '@/context/AuthContext';
+import { matchesService, MatchInfo } from '@/services/matchesService';
 
 export default function MatchesScreen() {
   const router = useRouter();
@@ -126,21 +55,29 @@ export default function MatchesScreen() {
   const [ring2Scale] = useState(() => new Animated.Value(1));
   const [ring2Opacity] = useState(() => new Animated.Value(0.3));
 
-  const loadMatches = useCallback(() => {
+  const { user } = useAuth() as any;
+  const [matches, setMatches] = useState<any[]>([]);
+
+  const loadMatches = useCallback(async () => {
+    if (!user?.id) return;
     setLoading(true);
     setError(false);
     
-    // Simulate API retrieval delay
-    setTimeout(() => {
+    try {
+      const data = await matchesService.getMatches(user.id);
+      setMatches(data);
+    } catch (err) {
+      setError(true);
+    } finally {
       setLoading(false);
-    }, 1500);
-  }, []);
+    }
+  }, [user?.id]);
 
   // Cargar matches al montar (useFocusEffect podría agregarse cuando haya datos reales)
   useEffect(() => {
     loadMatches();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [loadMatches]);
 
   // Pulse ring animation loop
   useEffect(() => {
@@ -229,7 +166,7 @@ export default function MatchesScreen() {
 
 
 
-  const filteredMatches = DUMMY_MATCHES.filter(match => {
+  const filteredMatches = matches.filter(match => {
     // 1. Búsqueda por texto — número usa .includes() para búsqueda parcial
     const query = searchQuery.toLowerCase().trim();
     const matchesQuery =
@@ -241,16 +178,9 @@ export default function MatchesScreen() {
 
     if (!matchesQuery) return false;
 
-    // 2. Filtro por tipo de coincidencia
-    // "ofrecidas" = el otro usuario tiene una repetida que vos buscás (te da algo)
-    // "buscadas"  = el otro usuario necesita algo que vos tenés repetido (vos das)
-    // Con datos mock se simula una distribución representativa por ID:
-    if (activeFilter === 'ofrecidas') {
-      return ['1', '3'].includes(match.id);
-    }
-    if (activeFilter === 'buscadas') {
-      return ['2'].includes(match.id);
-    }
+    // TODO: Implementar filtro por "ofrecidas" y "buscadas" cuando haya estructura de datos completa
+    // if (activeFilter === 'ofrecidas') { ... }
+    // if (activeFilter === 'buscadas') { ... }
 
     return true; // 'todas'
   });

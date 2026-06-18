@@ -24,7 +24,6 @@ create table if not exists public.profiles (
 	id uuid primary key references auth.users(id) on delete cascade,
 	email text not null unique,
 	nombre text,
-	barrio text,
 	reputacion integer not null default 0 check (reputacion >= 0 and reputacion <= 5),
 	created_at timestamptz not null default now(),
 	updated_at timestamptz not null default now()

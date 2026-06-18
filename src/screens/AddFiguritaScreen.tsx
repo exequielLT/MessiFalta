@@ -20,7 +20,7 @@ import { searchPlayer } from '../services/api';
 import { buildPlayerImageFileName, uploadPlayerImage } from '../services/storageService';
 import { figuritasService } from '../services/figuritasService';
 import { playerMapping } from '../constants/playerMapping';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '@/context/AuthContext';
 
 interface AddFiguritaScreenProps {
   onClose?: () => void;

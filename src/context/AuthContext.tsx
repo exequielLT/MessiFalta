@@ -55,10 +55,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (session?.user) {
           setUser({ id: session.user.id, email: session.user.email || '' });
         } else {
-          const localSession = await AsyncStorage.getItem('user_session');
-          if (localSession) {
-            setUser({ id: 'mock-user-id', email: 'user@example.com' });
-          }
+          setUser(null);
         }
       } catch (e) {
         console.error(e);
@@ -221,18 +218,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    return {
-      user: { id: 'mock-user-id', email: 'user@example.com' },
-      loading: false,
-      isPasswordRecovery: false,
-      setIsPasswordRecovery: () => {},
-      signUp: async () => {},
-      signIn: async () => {},
-      signInWithGoogle: async () => {},
-      resetPassword: async () => {},
-      updatePassword: async () => {},
-      signOut: async () => {},
-    };
+    throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
 };

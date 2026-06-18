@@ -11,37 +11,24 @@ if (typeof globalThis.WebSocket === 'undefined' && typeof window === 'undefined'
   (globalThis as any).WebSocket = class {} as any;
 }
 
-// Validamos si el entorno actual es el servidor (Node.js) durante el renderizado de Expo
-const isServer = typeof window === 'undefined';
-
-// Adaptador híbrido y seguro para Web (SSR/Client) y Mobile
-const customStorage = {
-  getItem: async (key: string) => {
-    if (Platform.OS === 'web') {
-      if (!isServer) return localStorage.getItem(key);
-      return null;
-    }
+const ExpoSecureStoreAdapter = {
+  getItem: (key: string) => {
+    if (typeof window === 'undefined') return Promise.resolve(null);
     return AsyncStorage.getItem(key);
   },
-  setItem: async (key: string, value: string) => {
-    if (Platform.OS === 'web') {
-      if (!isServer) localStorage.setItem(key, value);
-    } else {
-      await AsyncStorage.setItem(key, value);
-    }
+  setItem: (key: string, value: string) => {
+    if (typeof window === 'undefined') return Promise.resolve();
+    return AsyncStorage.setItem(key, value);
   },
-  removeItem: async (key: string) => {
-    if (Platform.OS === 'web') {
-      if (!isServer) localStorage.removeItem(key);
-    } else {
-      await AsyncStorage.removeItem(key);
-    }
+  removeItem: (key: string) => {
+    if (typeof window === 'undefined') return Promise.resolve();
+    return AsyncStorage.removeItem(key);
   },
 };
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    storage: customStorage,
+    storage: ExpoSecureStoreAdapter,
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,

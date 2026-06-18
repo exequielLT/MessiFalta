@@ -1,5 +1,5 @@
 import React from 'react';
-import { AddFiguritaScreen } from '../screens/AddFiguritaScreen';
+import { AddFiguritaScreen } from '@/screens/AddFiguritaScreen';
 
 interface AddFiguritaWrapperProps {
   onClose: () => void;
