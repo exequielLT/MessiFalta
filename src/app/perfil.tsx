@@ -22,6 +22,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { Button } from '@/components/Button';
 import AppHeader from '@/components/AppHeader';
 import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/services/supabase';
 
 // Storage keys
 const PROFILE_STORAGE_KEY = 'messifalta_user_profile';
@@ -52,16 +53,16 @@ interface TradeRecord {
 
 export default function PerfilScreen() {
   const theme = useTheme();
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth() as any;
 
   // ── State ────────────────────────────────────────────────────────────────
 
   const [userProfile, setUserProfile] = useState<UserProfile>({
-    name: 'Lucas Rodríguez',
-    email: 'lucas.r@gmail.com',
-    location: 'Barrio Centro',
-    rating: 4,
-    totalTrades: 12,
+    name: '',
+    email: '',
+    location: 'Sin ubicación',
+    rating: 0,
+    totalTrades: 0,
   });
 
   // Edit profile modal
@@ -78,58 +79,36 @@ export default function PerfilScreen() {
 
   // ── Data ─────────────────────────────────────────────────────────────────
 
-  const recentTrades: TradeRecord[] = [
-    {
-      id: '1',
-      type: 'completed',
-      offered: 'Nº 89',
-      received: 'Nº 200',
-      date: '15/06/2026',
-      status: 'Exitoso',
-      partner: 'Martín G.',
-    },
-    {
-      id: '2',
-      type: 'completed',
-      offered: 'Nº 12',
-      received: 'Nº 45',
-      date: '10/06/2026',
-      status: 'Exitoso',
-      partner: 'Ana P.',
-    },
-    {
-      id: '3',
-      type: 'pending',
-      offered: 'Nº 102',
-      received: 'Nº 10',
-      date: '08/06/2026',
-      status: 'Pendiente',
-      partner: 'Carlos M.',
-    },
-    {
-      id: '4',
-      type: 'cancelled',
-      offered: 'Nº 55',
-      received: 'Nº 301',
-      date: '02/06/2026',
-      status: 'Cancelado',
-      partner: 'Jorge L.',
-    },
-  ];
+  const [recentTrades, setRecentTrades] = useState<TradeRecord[]>([]);
 
   // ── Effects ──────────────────────────────────────────────────────────────
 
   useFocusEffect(
     useCallback(() => {
       const loadProfile = async () => {
+        if (!user?.id) return;
         try {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('nombre, email, reputacion')
+            .eq('id', user.id)
+            .single();
+            
+          if (data && !error) {
+            setUserProfile((prev) => ({
+              ...prev,
+              name: data.nombre || '',
+              email: data.email || user.email || '',
+              rating: data.reputacion || 0,
+            }));
+          }
+
+          // Fetch location from local storage as it's not in DB schema yet
           const saved = await AsyncStorage.getItem(PROFILE_STORAGE_KEY);
           if (saved) {
             const parsed = JSON.parse(saved);
             setUserProfile((prev) => ({
               ...prev,
-              name: parsed.name || prev.name,
-              email: parsed.email || prev.email,
               location: parsed.location || prev.location,
             }));
           }
@@ -138,7 +117,7 @@ export default function PerfilScreen() {
         }
       };
       loadProfile();
-    }, [])
+    }, [user?.id])
   );
 
   // ── Handlers ─────────────────────────────────────────────────────────────
