@@ -74,6 +74,7 @@ CREATE TRIGGER on_auth_user_created
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
 
 -- Permite buscar coincidencias en figuritas de otros usuarios sin exponer quiénes son
+DROP FUNCTION IF EXISTS public.get_anonymous_figuritas();
 CREATE OR REPLACE FUNCTION public.get_anonymous_figuritas()
 RETURNS TABLE (
   id uuid,
