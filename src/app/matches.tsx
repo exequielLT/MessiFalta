@@ -140,10 +140,30 @@ export default function MatchesScreen() {
     const randomChar2 = chars.charAt(Math.floor(Math.random() * chars.length));
     const code = `FIG-${randomNum}-${randomChar1}${randomChar2}`;
     
+    // Assign a random kiosk if not already set (e.g. for potential matches)
+    const kioscoId = selectedMatch.kioscoId || (Math.floor(Math.random() * 3) + 1);
+    
+    // Update local state to reflect the assigned kiosk name and address
+    const kioscos = [
+      { id: 1, nombre: 'Kiosco San Cayetano', direccion: 'Av. Virgen del Valle 350, San Fernando del Valle' },
+      { id: 2, nombre: 'Kiosco La Esquina',   direccion: 'Salta 920, San Fernando del Valle' },
+      { id: 3, nombre: 'Kiosco Plaza',        direccion: 'Rivadavia 650, San Fernando del Valle' },
+    ];
+    const assignedKiosco = kioscos.find(k => k.id === kioscoId);
+    
+    if (assignedKiosco) {
+      setSelectedMatch({
+        ...selectedMatch,
+        kioscoId: assignedKiosco.id,
+        kioscoNombre: assignedKiosco.nombre,
+        kioscoDireccion: assignedKiosco.direccion,
+      });
+    }
+
     const success = await matchesService.confirmExchange(
       selectedMatch.figuritaMiaId,
       selectedMatch.figuritaAjenaId,
-      selectedMatch.kioscoId,
+      kioscoId,
       code
     );
 

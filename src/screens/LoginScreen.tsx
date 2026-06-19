@@ -1,9 +1,9 @@
 import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
 import { colors } from '@/constants/theme';
-import { Ionicons } from '@expo/vector-icons';
-import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { Ionicons } from '@expo/vector-icons';
+import React, { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -70,7 +70,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       await signIn(email.trim(), password.trim());
       onLogin();
     } catch (error: any) {
-      console.error(error);
+      // console.error(error);
       const msg = error?.message || '';
       if (msg.includes('Invalid login credentials')) {
         setErrorMessage('Email o contraseña incorrectos.');
