@@ -20,9 +20,9 @@ import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { Kiosco } from '../types';
 
 const KIOSCOS_DATA: Kiosco[] = [
-  { id: 1, nombre: 'Kiosco San Cayetano', direccion: 'Av. Belgrano 450',  lat: -28.468, lng: -65.782, horario: '8 a 20 h' },
-  { id: 2, nombre: 'Kiosco La Esquina',   direccion: 'Rivadavia 1200',    lat: -28.470, lng: -65.788, horario: '9 a 21 h' },
-  { id: 3, nombre: 'Kiosco Plaza',        direccion: 'Sarmiento 300',     lat: -28.465, lng: -65.780, horario: '7 a 19 h' },
+  { id: 1, nombre: 'Kiosco San Cayetano', direccion: 'Av. Virgen del Valle 350, San Fernando del Valle', lat: -28.4686, lng: -65.7795, horario: '8 a 20 h' },
+  { id: 2, nombre: 'Kiosco La Esquina',   direccion: 'Salta 920, San Fernando del Valle',                lat: -28.4699, lng: -65.7859, horario: '9 a 21 h' },
+  { id: 3, nombre: 'Kiosco Plaza',        direccion: 'Rivadavia 650, San Fernando del Valle',            lat: -28.4662, lng: -65.7791, horario: '7 a 19 h' },
 ];
 
 // Dynamically load native-only react-native-maps to prevent web/SSR crashes

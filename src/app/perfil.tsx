@@ -82,7 +82,26 @@ export default function PerfilScreen() {
 
   // ── Data ─────────────────────────────────────────────────────────────────
 
-  const [recentTrades, setRecentTrades] = useState<TradeRecord[]>([]);
+  const [recentTrades, setRecentTrades] = useState<TradeRecord[]>([
+    {
+      id: 'mock-1',
+      type: 'completed',
+      offered: '128 - L. Messi',
+      received: '45 - E. Martínez',
+      date: '18/06/2026',
+      status: 'Completado',
+      partner: 'Lautaro Tapia',
+    },
+    {
+      id: 'mock-2',
+      type: 'completed',
+      offered: '88 - R. De Paul',
+      received: '210 - K. Mbappé',
+      date: '17/06/2026',
+      status: 'Completado',
+      partner: 'Graciela',
+    }
+  ]);
 
   // ── Effects ──────────────────────────────────────────────────────────────
 
@@ -93,7 +112,7 @@ export default function PerfilScreen() {
         try {
           const { data, error } = await supabase
             .from('profiles')
-            .select('nombre, email, reputacion')
+            .select('nombre, email, reputacion, barrio')
             .eq('id', user.id)
             .single();
             
@@ -103,16 +122,17 @@ export default function PerfilScreen() {
               name: data.nombre || '',
               email: data.email || user.email || '',
               rating: data.reputacion || 0,
+              location: data.barrio || 'Sin ubicación',
             }));
           }
 
-          // Fetch location from local storage as it's not in DB schema yet
+          // Fetch location and avatarUrl from local storage as fallback/addition
           const saved = await AsyncStorage.getItem(PROFILE_STORAGE_KEY);
           if (saved) {
             const parsed = JSON.parse(saved);
             setUserProfile((prev) => ({
               ...prev,
-              location: parsed.location || prev.location,
+              location: data?.barrio || parsed.location || prev.location,
               avatarUrl: parsed.avatarUrl || prev.avatarUrl,
             }));
           }
@@ -154,7 +174,10 @@ export default function PerfilScreen() {
       if (user?.id) {
         const { error } = await supabase
           .from('profiles')
-          .update({ nombre: editName.trim() })
+          .update({ 
+            nombre: editName.trim(),
+            barrio: editLocation.trim()
+          })
           .eq('id', user.id);
           
         if (error) throw error;

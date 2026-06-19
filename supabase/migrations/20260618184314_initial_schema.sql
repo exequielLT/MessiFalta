@@ -24,6 +24,7 @@ create table if not exists public.profiles (
 	id uuid primary key references auth.users(id) on delete cascade,
 	email text not null unique,
 	nombre text,
+	barrio text default 'Sin ubicación',
 	reputacion integer not null default 0 check (reputacion >= 0 and reputacion <= 5),
 	created_at timestamptz not null default now(),
 	updated_at timestamptz not null default now()
@@ -97,7 +98,7 @@ security definer
 set search_path = public
 as $$
 begin
-	insert into public.profiles (id, email, nombre)
+	insert into public.profiles (id, email, nombre, barrio)
 	values (
 		new.id,
 		coalesce(new.email, ''),
@@ -106,7 +107,8 @@ begin
 			new.raw_user_meta_data ->> 'full_name',
 			new.raw_user_meta_data ->> 'name',
 			split_part(coalesce(new.email, ''), '@', 1)
-		)
+		),
+		coalesce(new.raw_user_meta_data ->> 'barrio', 'Sin ubicación')
 	)
 	on conflict (id) do nothing;
 
