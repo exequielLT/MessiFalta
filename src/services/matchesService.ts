@@ -19,6 +19,8 @@ export interface MatchInfo {
   kioscoNombre: string;
   kioscoDireccion: string;
   barrio: string;
+  figuritaMiaId: string;
+  figuritaAjenaId: string;
 }
 
 export const matchesService = {
@@ -54,10 +56,31 @@ export const matchesService = {
         kioscoNombre: match.kiosco_nombre,
         kioscoDireccion: match.kiosco_direccion,
         barrio: match.barrio,
+        figuritaMiaId: match.figurita_mia_id,
+        figuritaAjenaId: match.figurita_ajena_id,
       }));
     } catch (err) {
       console.error('Exception fetching matches:', err);
       return [];
+    }
+  },
+  confirmExchange: async (figuritaMiaId: string, figuritaAjenaId: string, kioscoId: number, codigo: string): Promise<boolean> => {
+    try {
+      const { data, error } = await supabase.rpc('confirm_exchange', {
+        p_figurita_mia_id: figuritaMiaId,
+        p_figurita_ajena_id: figuritaAjenaId,
+        p_kiosco_id: kioscoId,
+        p_codigo: codigo
+      });
+
+      if (error) {
+        console.error('Error confirming exchange:', error);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.error('Exception confirming exchange:', err);
+      return false;
     }
   }
 };
