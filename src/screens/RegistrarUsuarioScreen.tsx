@@ -46,7 +46,12 @@ export const RegistrarUsuarioScreen: React.FC<
     } catch (error: any) {
       console.error(error);
       if (error?.message && !error.message.toLowerCase().includes('cancel')) {
-        setErrorMessage(error.message || 'Error al registrarse con Google.');
+        const msg = error.message;
+        if (msg.includes('provider is not enabled')) {
+          setErrorMessage('El registro con Google no está habilitado en la consola de Supabase. Activalo en Auth -> Providers.');
+        } else {
+          setErrorMessage(msg || 'Error al registrarse con Google.');
+        }
       }
     } finally {
       setLoading(false);

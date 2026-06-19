@@ -50,7 +50,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     } catch (error: any) {
       console.error(error);
       if (error?.message && !error.message.toLowerCase().includes('cancel')) {
-        setErrorMessage(error.message || 'Error al iniciar sesión con Google.');
+        const msg = error.message;
+        if (msg.includes('provider is not enabled')) {
+          setErrorMessage('El inicio de sesión con Google no está habilitado en la consola de Supabase. Activalo en Auth -> Providers.');
+        } else {
+          setErrorMessage(msg || 'Error al iniciar sesión con Google.');
+        }
       }
     } finally {
       setLoading(false);
