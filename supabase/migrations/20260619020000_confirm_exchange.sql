@@ -25,6 +25,19 @@ begin
         raise exception 'Figurita ajena no encontrada';
     end if;
 
+    -- Assign a random kiosk if none is provided
+    if p_kiosco_id is null then
+        select id into p_kiosco_id
+        from public.kioscos
+        where activo = true
+        order by random()
+        limit 1;
+    end if;
+
+    if p_kiosco_id is null then
+        raise exception 'No hay kioscos activos disponibles';
+    end if;
+
     -- Insert into matches with 'aceptado'
     insert into public.matches (user_a, user_b, figurita_a_id, figurita_b_id, tipo, estado)
     values (auth.uid(), v_user_b, p_figurita_mia_id, p_figurita_ajena_id, 'doble', 'aceptado')

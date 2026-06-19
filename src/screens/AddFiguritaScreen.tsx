@@ -110,11 +110,8 @@ export const AddFiguritaScreen: React.FC<AddFiguritaScreenProps> = ({ onClose })
         }
 
         if (data.photo) {
-          const generatedNum = generateNumberFromName(data.name || nameStr);
-          const fileName = buildPlayerImageFileName(generatedNum, data.name || nameStr);
-          const url = await uploadPlayerImage(data.photo, fileName);
           if (searchIdRef.current === currentSearchId) {
-            setImageUrl(url);
+            setImageUrl(data.photo);
           }
         }
 
@@ -169,12 +166,25 @@ export const AddFiguritaScreen: React.FC<AddFiguritaScreenProps> = ({ onClose })
 
     setSaving(true);
     try {
+      let finalImageUrl = imageUrl;
+      
+      // If we have an external image URL from the API, download and upload it to Supabase Storage only now!
+      if (imageUrl && imageUrl.startsWith('http') && !imageUrl.includes('supabase.co')) {
+        try {
+          const fileName = buildPlayerImageFileName(generatedNum, nombre.trim());
+          finalImageUrl = await uploadPlayerImage(imageUrl, fileName);
+        } catch (uploadErr) {
+          console.error('Failed to upload player image to Supabase on save:', uploadErr);
+          // If upload fails, fallback to the external URL so the card still has an image
+        }
+      }
+
       await figuritasService.createFigurita({
         userId: user.id,
         numero: generatedNum,
         tipo,
         nombreJugador: nombre.trim(),
-        imagenUrl: imageUrl,
+        imagenUrl: finalImageUrl,
         seleccion: nacionalidad.trim(),
       });
 
