@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, View, Pressable } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { ThemedText } from './themed-text';
 import { useTheme } from '@/hooks/use-theme';
@@ -21,8 +21,12 @@ export default function AppHeader({
 }: AppHeaderProps) {
   const theme = useTheme();
   const router = useRouter();
+  const pathname = usePathname();
   const colorScheme = useColorScheme();
   const { toggleTheme } = useThemeContext();
+
+  const isMatchesScreen = pathname === '/matches' || pathname.includes('matches');
+  const showBadge = pendingNotificationsCount > 0 && !isMatchesScreen;
 
   return (
     <View style={[styles.headerContainer, { borderColor: theme.outlineVariant + '33' }]}>
@@ -60,7 +64,7 @@ export default function AppHeader({
               accessibilityRole="button"
             >
               <Ionicons name="notifications-outline" size={24} color={theme.onSurface} />
-              {pendingNotificationsCount > 0 && (
+              {showBadge && (
                 <View style={[styles.badge, { backgroundColor: theme.error }]}>
                   <ThemedText style={styles.badgeText} type="labelSm">
                     {pendingNotificationsCount}

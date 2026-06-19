@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   ScrollView,
@@ -25,6 +25,7 @@ import { Button } from '@/components/Button';
 import AppHeader from '@/components/AppHeader';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/services/supabase';
+import { matchesService } from '@/services/matchesService';
 
 // Storage keys
 const PROFILE_STORAGE_KEY = 'messifalta_user_profile';
@@ -67,6 +68,7 @@ export default function PerfilScreen() {
     rating: 0,
     totalTrades: 0,
   });
+  const [pendingMatches, setPendingMatches] = useState(0);
 
   // Edit profile modal
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
@@ -79,6 +81,22 @@ export default function PerfilScreen() {
   // Logout confirmation modal
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+
+  // Full History modal state
+  const [isHistoryModalVisible, setIsHistoryModalVisible] = useState(false);
+
+  // Autocomplete / suggestions states
+  const VALID_NEIGHBORHOODS = [
+    'Catamarca Centro',
+    'Villa Cubas',
+    'La Chacarita',
+    'La Tablada',
+    'Choya',
+    'Capital',
+  ];
+  const [searchingLocation, setSearchingLocation] = useState(false);
+  const [locationSuggestions, setLocationSuggestions] = useState<string[]>([]);
+  const locationSearchTimeoutRef = useRef<any>(null);
 
   // ── Data ─────────────────────────────────────────────────────────────────
 
@@ -136,6 +154,36 @@ export default function PerfilScreen() {
               avatarUrl: parsed.avatarUrl || prev.avatarUrl,
             }));
           }
+
+          // Fetch confirmed matches
+          const { data: historyData, error: historyError } = await supabase.rpc('get_user_match_history');
+          if (historyData && !historyError) {
+            const mappedTrades: TradeRecord[] = historyData.map((row: any) => ({
+              id: String(row.match_id),
+              type: row.estado === 'completado' ? 'completed' : row.estado === 'cancelado' ? 'cancelled' : 'pending',
+              offered: `${row.offered_number} - ${row.offered_name}`,
+              received: `${row.received_number} - ${row.received_name}`,
+              date: new Date(row.created_at).toLocaleDateString('es-AR'),
+              status: row.estado === 'completado' ? 'Completado' : row.estado === 'cancelado' ? 'Cancelado' : 'Aceptado',
+              partner: row.partner_name || 'Usuario',
+            }));
+            setRecentTrades(mappedTrades);
+            
+            // Calculate total trades count (completed trades)
+            const completedCount = mappedTrades.filter((t) => t.type === 'completed').length;
+            setUserProfile((prev) => ({
+              ...prev,
+              totalTrades: completedCount,
+            }));
+          }
+
+          // Fetch pending matches count
+          try {
+            const matchesData = await matchesService.getMatches(user.id);
+            setPendingMatches(matchesData.length);
+          } catch (matchesErr) {
+            console.error('Error al obtener matches en PerfilScreen:', matchesErr);
+          }
         } catch (e) {
           console.error('Error al cargar perfil:', e);
         }
@@ -152,6 +200,46 @@ export default function PerfilScreen() {
     setIsEditModalVisible(true);
   };
 
+  const handleLocationChange = (text: string) => {
+    setEditLocation(text);
+    setLocationSuggestions([]);
+    
+    if (locationSearchTimeoutRef.current) {
+      clearTimeout(locationSearchTimeoutRef.current);
+    }
+
+    if (!text.trim()) {
+      setSearchingLocation(false);
+      return;
+    }
+
+    setSearchingLocation(true);
+    locationSearchTimeoutRef.current = setTimeout(() => {
+      const query = text.trim().toLowerCase();
+      if (query.length >= 2) {
+        const filtered = VALID_NEIGHBORHOODS.filter(
+          (b) => b.toLowerCase().includes(query) && b.toLowerCase() !== query
+        );
+        setLocationSuggestions(filtered);
+      }
+      setSearchingLocation(false);
+    }, 400);
+  };
+
+  const handleSelectSuggestion = (suggestion: string) => {
+    setEditLocation(suggestion);
+    setLocationSuggestions([]);
+    if (locationSearchTimeoutRef.current) {
+      clearTimeout(locationSearchTimeoutRef.current);
+    }
+  };
+
+  const isValidLocation = (text: string) => {
+    return VALID_NEIGHBORHOODS.some(
+      (b) => b.toLowerCase() === text.trim().toLowerCase()
+    );
+  };
+
   const handleSaveProfile = async () => {
     if (!editName.trim()) {
       Alert.alert('Error', 'El nombre no puede estar vacío.');
@@ -162,11 +250,23 @@ export default function PerfilScreen() {
       return;
     }
 
+    const officialNeighborhood = VALID_NEIGHBORHOODS.find(
+      (b) => b.toLowerCase() === editLocation.trim().toLowerCase()
+    );
+
+    if (!officialNeighborhood) {
+      Alert.alert(
+        'Ubicación inválida',
+        'Por favor, ingresá o seleccioná un barrio válido de Catamarca (ej. Catamarca Centro, Villa Cubas, La Chacarita, La Tablada, Choya, Capital).'
+      );
+      return;
+    }
+
     setSaving(true);
     try {
       const updatedProfile = {
         name: editName.trim(),
-        location: editLocation.trim(),
+        location: officialNeighborhood,
         email: userProfile.email,
         avatarUrl: userProfile.avatarUrl,
       };
@@ -176,7 +276,7 @@ export default function PerfilScreen() {
           .from('profiles')
           .update({ 
             nombre: editName.trim(),
-            barrio: editLocation.trim()
+            barrio: officialNeighborhood
           })
           .eq('id', user.id);
           
@@ -204,7 +304,7 @@ export default function PerfilScreen() {
   };
 
   const handleFullHistory = () => {
-    Alert.alert('Historial Completo', 'El historial detallado estará disponible próximamente.');
+    setIsHistoryModalVisible(true);
   };
 
   const handleAvatarPress = async () => {
@@ -248,7 +348,7 @@ export default function PerfilScreen() {
     }
   };
 
-  const pendingMatches = 2;
+
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -383,54 +483,62 @@ export default function PerfilScreen() {
               },
             ]}
           >
-            {recentTrades.map((trade, index) => {
-              const visuals = getTradeVisuals(trade.type);
+            {recentTrades.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <ThemedText type="bodyMd" style={{ color: theme.onSurfaceVariant, textAlign: 'center', paddingVertical: Spacing.three }}>
+                  Sin intercambios recientes
+                </ThemedText>
+              </View>
+            ) : (
+              recentTrades.slice(0, 3).map((trade, index) => {
+                const visuals = getTradeVisuals(trade.type);
 
-              return (
-                <View
-                  key={trade.id}
-                  style={[
-                    styles.tradeItem,
-                    { borderColor: theme.outlineVariant + '22' },
-                    index === recentTrades.length - 1 && styles.lastTradeItem,
-                  ]}
-                >
-                  {/* Status Icon */}
-                  <View style={[styles.tradeIconContainer, { backgroundColor: visuals.iconBg }]}>
-                    <Ionicons name={visuals.icon} size={20} color={visuals.iconColor} />
-                  </View>
+                return (
+                  <View
+                    key={trade.id}
+                    style={[
+                      styles.tradeItem,
+                      { borderColor: theme.outlineVariant + '22' },
+                      index === Math.min(recentTrades.length, 3) - 1 && styles.lastTradeItem,
+                    ]}
+                  >
+                    {/* Status Icon */}
+                    <View style={[styles.tradeIconContainer, { backgroundColor: visuals.iconBg }]}>
+                      <Ionicons name={visuals.icon} size={20} color={visuals.iconColor} />
+                    </View>
 
-                  {/* Trade Details */}
-                  <View style={styles.tradeInfo}>
-                    <ThemedText type="bodyMd" style={styles.tradeDescription}>
-                      {'Entregaste '}
-                      <ThemedText type="bodyMd" style={styles.boldText}>
-                        {trade.offered}
+                    {/* Trade Details */}
+                    <View style={styles.tradeInfo}>
+                      <ThemedText type="bodyMd" style={styles.tradeDescription}>
+                        {'Entregaste '}
+                        <ThemedText type="bodyMd" style={styles.boldText}>
+                          {trade.offered}
+                        </ThemedText>
+                        {', recibiste '}
+                        <ThemedText type="bodyMd" style={styles.boldText}>
+                          {trade.received}
+                        </ThemedText>
                       </ThemedText>
-                      {', recibiste '}
-                      <ThemedText type="bodyMd" style={styles.boldText}>
-                        {trade.received}
-                      </ThemedText>
-                    </ThemedText>
-                    {trade.partner && (
+                      {trade.partner && (
+                        <ThemedText type="labelSm" style={{ color: theme.onSurfaceVariant, marginTop: 1 }}>
+                          Con {trade.partner}
+                        </ThemedText>
+                      )}
                       <ThemedText type="labelSm" style={{ color: theme.onSurfaceVariant, marginTop: 1 }}>
-                        Con {trade.partner}
+                        {trade.date}
                       </ThemedText>
-                    )}
-                    <ThemedText type="labelSm" style={{ color: theme.onSurfaceVariant, marginTop: 1 }}>
-                      {trade.date}
-                    </ThemedText>
-                  </View>
+                    </View>
 
-                  {/* Status Badge */}
-                  <View style={[styles.statusBadge, { backgroundColor: visuals.statusBg }]}>
-                    <ThemedText style={[styles.statusBadgeText, { color: visuals.statusColor }]} type="labelSm">
-                      {trade.status}
-                    </ThemedText>
+                    {/* Status Badge */}
+                    <View style={[styles.statusBadge, { backgroundColor: visuals.statusBg }]}>
+                      <ThemedText style={[styles.statusBadgeText, { color: visuals.statusColor }]} type="labelSm">
+                        {trade.status}
+                      </ThemedText>
+                    </View>
                   </View>
-                </View>
-              );
-            })}
+                );
+              })
+            )}
           </View>
 
           {/* Full History link */}
@@ -561,27 +669,162 @@ export default function PerfilScreen() {
               {/* Location */}
               <View style={styles.inputGroup}>
                 <ThemedText type="labelMd" style={[styles.label, { color: theme.onSurfaceVariant }]}>
-                  Barrio / Ubicación
+                  Ubicación
                 </ThemedText>
-                <TextInput
-                  value={editLocation}
-                  onChangeText={setEditLocation}
-                  onFocus={() => setIsLocationFocused(true)}
-                  onBlur={() => setIsLocationFocused(false)}
-                  placeholder="Barrio o Ciudad"
-                  placeholderTextColor={theme.onSurfaceVariant + '88'}
+                <View style={styles.inputWrapper}>
+                  <TextInput
+                    value={editLocation}
+                    onChangeText={handleLocationChange}
+                    onFocus={() => setIsLocationFocused(true)}
+                    onBlur={() => setIsLocationFocused(false)}
+                    placeholder="Ingresá tu barrio o ciudad"
+                    placeholderTextColor={theme.onSurfaceVariant + '88'}
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: theme.surfaceContainerHigh,
+                        color: theme.onSurface,
+                        borderColor: isLocationFocused ? theme.primary : 'transparent',
+                        borderWidth: 2,
+                        paddingRight: 40,
+                      },
+                    ]}
+                    maxLength={40}
+                  />
+                  {searchingLocation && (
+                    <ActivityIndicator
+                      size="small"
+                      color={theme.primary}
+                      style={styles.inputIconRight}
+                    />
+                  )}
+                  {!searchingLocation && isValidLocation(editLocation) && (
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={20}
+                      color={theme.secondary}
+                      style={styles.inputIconRight}
+                    />
+                  )}
+                </View>
+                {/* Suggestions List */}
+                {locationSuggestions.length > 0 && (
+                  <View style={styles.suggestionsContainer}>
+                    {locationSuggestions.map((suggestion) => (
+                      <TouchableOpacity
+                        key={suggestion}
+                        style={[styles.suggestionChip, { backgroundColor: theme.surfaceContainerHighest, borderColor: theme.outlineVariant }]}
+                        onPress={() => handleSelectSuggestion(suggestion)}
+                      >
+                        <ThemedText type="bodyMd" style={{ color: theme.onSurface }}>
+                          {suggestion}
+                        </ThemedText>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+            </View>
+          </ScrollView>
+        </ThemedView>
+      </Modal>
+
+      {/* ── Full History Modal ─────────────────────────────────────── */}
+      <Modal
+        visible={isHistoryModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setIsHistoryModalVisible(false)}
+      >
+        <ThemedView style={styles.modalRoot}>
+          {/* Modal Header */}
+          <View style={[styles.modalHeader, { borderColor: theme.outlineVariant + '33' }]}>
+            <Pressable
+              onPress={() => setIsHistoryModalVisible(false)}
+              style={({ pressed }) => [styles.modalHeaderButton, pressed && styles.pressed]}
+            >
+              <ThemedText type="bodyLg" style={{ color: theme.primary, fontWeight: '600' }}>
+                Cerrar
+              </ThemedText>
+            </Pressable>
+            <ThemedText type="headlineSm" style={styles.modalTitle}>
+              Historial Completo
+            </ThemedText>
+            <View style={{ minWidth: 80 }} />
+          </View>
+
+          <ScrollView
+            contentContainerStyle={styles.modalContent}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.tradesSection}>
+              {recentTrades.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <Ionicons name="swap-horizontal-outline" size={48} color={theme.onSurfaceVariant + '44'} />
+                  <ThemedText type="bodyMd" style={{ color: theme.onSurfaceVariant, marginTop: 12, textAlign: 'center' }}>
+                    Todavía no realizaste ningún intercambio.
+                  </ThemedText>
+                </View>
+              ) : (
+                <View
                   style={[
-                    styles.input,
+                    styles.tradesCard,
                     {
-                      backgroundColor: theme.surfaceContainerHigh,
-                      color: theme.onSurface,
-                      borderColor: isLocationFocused ? theme.primary : 'transparent',
-                      borderWidth: 2,
+                      backgroundColor: theme.surfaceContainerLowest,
+                      borderColor: theme.outlineVariant + '44',
                     },
                   ]}
-                  maxLength={40}
-                />
-              </View>
+                >
+                  {recentTrades.map((trade, index) => {
+                    const visuals = getTradeVisuals(trade.type);
+
+                    return (
+                      <View
+                        key={trade.id}
+                        style={[
+                          styles.tradeItem,
+                          { borderColor: theme.outlineVariant + '22' },
+                          index === recentTrades.length - 1 && styles.lastTradeItem,
+                        ]}
+                      >
+                        {/* Status Icon */}
+                        <View style={[styles.tradeIconContainer, { backgroundColor: visuals.iconBg }]}>
+                          <Ionicons name={visuals.icon} size={20} color={visuals.iconColor} />
+                        </View>
+
+                        {/* Trade Details */}
+                        <View style={styles.tradeInfo}>
+                          <ThemedText type="bodyMd" style={styles.tradeDescription}>
+                            {'Entregaste '}
+                            <ThemedText type="bodyMd" style={styles.boldText}>
+                              {trade.offered}
+                            </ThemedText>
+                            {', recibiste '}
+                            <ThemedText type="bodyMd" style={styles.boldText}>
+                              {trade.received}
+                            </ThemedText>
+                          </ThemedText>
+                          {trade.partner && (
+                            <ThemedText type="labelSm" style={{ color: theme.onSurfaceVariant, marginTop: 1 }}>
+                              Con {trade.partner}
+                            </ThemedText>
+                          )}
+                          <ThemedText type="labelSm" style={{ color: theme.onSurfaceVariant, marginTop: 1 }}>
+                            {trade.date}
+                          </ThemedText>
+                        </View>
+
+                        {/* Status Badge */}
+                        <View style={[styles.statusBadge, { backgroundColor: visuals.statusBg }]}>
+                          <ThemedText style={[styles.statusBadgeText, { color: visuals.statusColor }]} type="labelSm">
+                            {trade.status}
+                          </ThemedText>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
             </View>
           </ScrollView>
         </ThemedView>
@@ -956,5 +1199,32 @@ const styles = StyleSheet.create({
   confirmBtnCancelText: {
     fontSize: 15,
     fontWeight: '600',
+  },
+  inputWrapper: {
+    position: 'relative',
+    width: '100%',
+  },
+  inputIconRight: {
+    position: 'absolute',
+    right: 12,
+    top: 14,
+  },
+  suggestionsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+    paddingHorizontal: 4,
+  },
+  suggestionChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
   },
 });

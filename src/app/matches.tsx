@@ -6,7 +6,7 @@ import { spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -41,6 +41,13 @@ export default function MatchesScreen() {
   const [error, setError] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'todas' | 'ofrecidas' | 'buscadas'>('todas');
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
+
+  // Reset page when filter or search query changes
+  useEffect(() => {
+    setPage(1);
+  }, [activeFilter, searchQuery]);
 
   // Modal navigation states
   const [showModal, setShowModal] = useState(false);
@@ -73,11 +80,12 @@ export default function MatchesScreen() {
     }
   }, [user?.id]);
 
-  // Cargar matches al montar (useFocusEffect podría agregarse cuando haya datos reales)
-  useEffect(() => {
-    loadMatches();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadMatches]);
+  // Cargar matches al enfocar la pantalla
+  useFocusEffect(
+    useCallback(() => {
+      loadMatches();
+    }, [loadMatches])
+  );
 
   // Pulse ring animation loop
   useEffect(() => {
@@ -206,19 +214,26 @@ export default function MatchesScreen() {
     const query = searchQuery.toLowerCase().trim();
     const matchesQuery =
       match.userName.toLowerCase().includes(query) ||
-      match.offeredFigurita.name.toLowerCase().includes(query) ||
-      match.requestedFigurita.name.toLowerCase().includes(query) ||
-      match.offeredFigurita.number.toString().includes(query) ||
-      match.requestedFigurita.number.toString().includes(query);
+      (match.offeredFigurita?.name || '').toLowerCase().includes(query) ||
+      (match.requestedFigurita?.name || '').toLowerCase().includes(query) ||
+      (match.offeredFigurita?.number?.toString() || '').includes(query) ||
+      (match.requestedFigurita?.number?.toString() || '').includes(query);
 
     if (!matchesQuery) return false;
 
-    // TODO: Implementar filtro por "ofrecidas" y "buscadas" cuando haya estructura de datos completa
-    // if (activeFilter === 'ofrecidas') { ... }
-    // if (activeFilter === 'buscadas') { ... }
+    // 2. Filtro por tipo de coincidencia (todas, ofrecidas, buscadas)
+    if (activeFilter === 'ofrecidas') {
+      return !!match.offeredFigurita && match.offeredFigurita.number > 0;
+    }
+    if (activeFilter === 'buscadas') {
+      return !!match.requestedFigurita && match.requestedFigurita.number > 0;
+    }
 
     return true; // 'todas'
   });
+
+  const displayedMatches = filteredMatches.slice(0, page * PAGE_SIZE);
+  const hasMore = filteredMatches.length > page * PAGE_SIZE;
 
   // Render sub-views depending on screen states
   if (loading) {
@@ -376,7 +391,7 @@ export default function MatchesScreen() {
         ) : (
           /* Results list */
           <View style={styles.listContainer}>
-            {filteredMatches.map(match => (
+            {displayedMatches.map(match => (
               <CardMatch
                 key={match.id}
                 userName={match.userName}
@@ -390,6 +405,22 @@ export default function MatchesScreen() {
                 style={styles.cardSpacing}
               />
             ))}
+
+            {hasMore && (
+              <TouchableOpacity
+                onPress={() => setPage(p => p + 1)}
+                style={[
+                  styles.loadMoreBtn,
+                  { borderColor: theme.primary },
+                ]}
+                accessibilityLabel="Ver más coincidencias"
+                accessibilityRole="button"
+              >
+                <Text style={[styles.loadMoreText, { color: theme.primary }]}>
+                  Ver más ({filteredMatches.length - page * PAGE_SIZE} restantes)
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
       </ScrollView>
@@ -737,6 +768,18 @@ const styles = StyleSheet.create({
   },
   cardSpacing: {
     marginBottom: 2,
+  },
+  loadMoreBtn: {
+    alignSelf: 'center',
+    marginVertical: spacing.md,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 999,
+    borderWidth: 1.5,
+  },
+  loadMoreText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
 
   // Loading view styles

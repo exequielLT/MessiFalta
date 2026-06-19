@@ -72,7 +72,7 @@ Si el archivo ya existe, no se reemplaza.
 La URL pública de Supabase Storage se guarda en figuritas.imagen_url.
 
 Límites del plan gratuito
-100 requests por día. Para no excederlo, se aplica un debounce de 800ms en el campo de número de figurita y se cachean las imágenes en Storage.
+100 requests por día. Para no excederlo, se aplica un debounce de 800ms en el campo de nombre del jugador al agregar figuritas y se cachean las imágenes subidas en Supabase Storage.
 
 Seguridad
 La API key se almacena en .env (EXPO_PUBLIC_API_FOOTBALL_KEY) y no se commitea.

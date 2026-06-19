@@ -38,50 +38,49 @@ Camino crítico: **Onboarding (único)** → **Login / Registro** → Agregar fi
 - Al hacer logout, se limpia el flag para que el próximo usuario lo vea.
 
 #### CRUD de figuritas
-- Campo `numero` (obligatorio, 1-678).
+- Campo `nombre_jugador` (obligatorio, ingresado por el usuario y buscado en la API).
 - Campo `tipo` (obligatorio: `'repetida'` | `'faltante'`).
-- Campo `nombre_jugador` (opcional, desde mapeo local o API).
-- Campo `imagen_url` (opcional, desde API → Supabase Storage).
-- Campo `seleccion` (desde mapeo local, no desde API).
+- Campo `numero` (calculado determinísticamente de 1 a 678 en base al hash del nombre del jugador para mantener compatibilidad relacional).
+- Campo `imagen_url` (opcional, devuelto por la API y descargado/subido a Supabase Storage al guardar la figurita).
+- Campo `seleccion` (nacionalidad del jugador, autocompletada por la API o ingresada manualmente).
 - Sincronizado con Supabase.
 
 #### API externa api-football.com
 - **Uso exclusivo para:**
-  1. Obtener el **nombre oficial** del jugador.
-  2. Obtener la **foto** del jugador y cachearla en Supabase Storage.
-- **No se usa para:** selección, dorsal, logo de selección (datos estáticos desde mapeo local).
+  1. Obtener la **nacionalidad** del jugador para autocompletar la selección.
+  2. Obtener la **foto** oficial del jugador y subirla a Supabase Storage al guardar la figurita.
 - **Endpoint:** `GET https://v3.football.api-sports.io/players?season=2026&league=1&search={nombre}`
-- **Estados:** carga (spinner), éxito (autocompletado + imagen cacheada), vacío ("Jugador no encontrado"), error (mensaje + botón "Reintentar").
-- **Debounce:** 800ms antes de llamar a la API.
+- **Estados:** carga (spinner), éxito (autocompletado de selección + preview de imagen), vacío ("Jugador no encontrado. Podés guardarlo igual"), error (mensaje descriptivo + botón "Reintentar").
+- **Debounce:** 800ms al escribir el nombre del jugador para mitigar consumo de consultas.
 - **API Key:** en `.env` (`EXPO_PUBLIC_API_FOOTBALL_KEY`), no commiteada.
 
-#### Mapeo local (`playerMapping.ts`)
-- Para ~30 jugadores del Mundial 2026.
-- Cada entrada incluye: `numero`, `nombre`, `seleccion`, referencia a `assets/banderas/{seleccion}.png`.
-- Si un número está en el mapeo, se usa el nombre local; la API se consulta para obtener la foto oficial y validar el nombre.
-- Si un número NO está en el mapeo, el usuario puede ingresar el nombre manualmente; la API puede buscar la foto si el nombre es correcto.
+#### Determinación de Número de Figurita
+- En lugar de forzar al usuario a ingresar manualmente un número de figurita o depender de un mapeo estático de 30 jugadores, el sistema genera de forma determinística un número entero entre 1 y 678 en base al hash del nombre del jugador. Esto preserva de manera transparente la compatibilidad con el algoritmo relacional de matchmaking de Supabase.
 
 #### Matches (coincidencias)
 - Generados dinámicamente a partir de las figuritas del usuario.
 - Cruce: figuritas `repetida` del usuario ↔ figuritas `faltante` de otros usuarios.
+- Filtro en pantalla diferenciando correctamente las figuritas "ofrecidas" (las que otros usuarios ofrecen y me sirven) de las "buscadas" (las que yo tengo repetidas y le sirven a otros).
 - Si no hay suficientes usuarios reales, se complementa con datos dummy **vinculados a las figuritas del usuario** (no matches genéricos).
 
 #### Flujo de intercambio
 - Detalle de match con modal de confirmación.
 - Generación de código único (formato `FIG-XXXX-KX`).
-- Registro en tabla `intercambios` con kiosco asignado aleatoriamente.
+- Registro en tabla `intercambios` con kiosco asignado aleatoriamente de los activos.
 - Pantalla de código con QR, instrucciones y botón para ver en mapa.
 
 #### Mapa de kioscos
-- 3 kioscos hardcodeados (datos reales de Catamarca, adhesión ficticia).
+- Consulta dinámicamente de Supabase los kioscos activos (actualmente 6 marcadores).
 - Si se recibe `kioscoId`, se destaca en verde.
 - Tarjeta inferior con nombre, dirección y horario al tocar un marcador.
+- Botón "Cómo llegar" integrado con la aplicación nativa de mapas de Google (mediante redirección URL).
 
 #### Perfil
-- Datos del usuario desde Supabase.
-- Reputación simulada (intercambios dummy completados).
-- Historial breve de intercambios.
-- Botón "Cerrar sesión".
+- Datos del usuario desde la tabla `profiles` de Supabase.
+- Permite editar el nombre y el barrio (ubicación) del usuario con una lista de sugerencias autocompletadas para barrios válidos de Catamarca.
+- Reputación simulada en base a la cantidad de intercambios reales completados.
+- Historial completo de intercambios en modal.
+- Botón "Cerrar sesión" que limpia AsyncStorage y redirige a Login.
 
 #### Manejo de estados de interfaz
 - **Carga:** `StatusScreen` con spinner.
@@ -187,20 +186,16 @@ Headers: x-apisports-key: <API_KEY>
 - `player.statistics[0].team.logo` (logo de selección).
 
 ### Flujo en AddFiguritaScreen
-1. Usuario ingresa número de figurita. Debounce de 800ms.
-2. Se busca el número en `playerMapping.ts`.
-3. Si existe:
-   - Se muestra el nombre y selección del mapeo local.
-   - Se consulta la API con el nombre mapeado para obtener la foto oficial.
-4. Si no existe:
-   - El usuario ingresa el nombre manualmente.
-   - Si ingresa un nombre, se consulta la API para obtener la foto.
-5. Estados visuales:
-   - **Carga:** spinner en campo nombre.
-   - **Éxito:** autocompletado del nombre + imagen descargada y subida a Storage.
-   - **Vacío:** "Jugador no encontrado. Podés guardarlo sin nombre."
-   - **Error:** "No se pudo obtener la imagen. ¿Reintentar?" + botón.
-6. Se permite guardar la figurita sin nombre y sin imagen si la API falla.
+1. El usuario ingresa el nombre del jugador en el campo de texto. Debounce de 800ms.
+2. Se realiza una búsqueda automática en API Football llamando a `searchPlayer(nombre)`.
+3. Si la API devuelve datos exitosamente:
+   - Se autocompleta el campo de selección con la nacionalidad oficial obtenida.
+   - Se muestra un preview de la foto oficial del jugador devuelta por la API.
+   - Se muestra un check de éxito (verde) por 2 segundos.
+4. Si la API no encuentra al jugador, se muestra una advertencia descriptiva y se permite continuar con el ingreso manual del nombre y de la selección.
+5. Al guardar, si hay una foto externa, se descarga e inserta en el bucket de Supabase Storage.
+6. El número de figurita (1-678) se genera automáticamente mediante hashing del nombre del jugador para mantener compatibilidad con el sistema de matchmaking.
+7. Se permite guardar la figurita manualmente y sin imagen si la búsqueda en la API falla o se cancela.
 
 ## Gestión de errores y logging
 - **Errores de red:** se muestran mensajes descriptivos con botón de reintento.
