@@ -28,14 +28,16 @@ FiguMatch sigue una arquitectura **cliente-servidor** con un frontend móvil des
 
 ## Flujo de datos principal
 1. **Autenticación:** El usuario se registra o inicia sesión. `AuthContext` almacena la sesión y el `RootNavigator` redirige a `MainTabs`.
-2. **Carga de figuritas:** En `AddFiguritaScreen`, el usuario ingresa un número. Se consulta el mapeo local (`playerMapping.ts`) y, si existe, se llama a `api.ts` para obtener nombre y foto. La foto se descarga y se sube a Supabase Storage (`storageService.ts`). Los datos se guardan en la tabla `figuritas` de Supabase.
-3. **Matches:** En `MatchesScreen`, se consultan las figuritas del usuario y las de otros (mediante función SQL anónima). Si no hay suficientes coincidencias reales, se complementan con datos dummy vinculados a las figuritas del usuario.
-4. **Intercambio:** En `MatchDetailScreen`, al aceptar, se genera un código único, se asigna un kiosco aleatorio y se inserta un registro en la tabla `intercambios`. Luego se navega a `CodeScreen` (modal raíz) para mostrar el código QR y las instrucciones.
-5. **Mapa:** `MapScreen` muestra tres kioscos hardcodeados. Si recibe un `kioscoId`, lo destaca en verde.
+2. **Carga de figuritas:** En `AddFiguritaScreen`, el usuario ingresa el nombre de un jugador. Se realiza una búsqueda debounceada (800ms) a `api.ts` para obtener la nacionalidad y foto oficial de API Football. El número de figurita (1-678) se calcula de forma determinística en base al hash del nombre del jugador. Al presionar Guardar, si hay una foto externa, se descarga y sube a Supabase Storage (`storageService.ts`), insertando el registro final en la tabla `figuritas`.
+3. **Matches:** En `MatchesScreen`, se consultan las figuritas del usuario y las de otros. Se implementa un filtrado bidireccional correcto ("ofrecidas" vs "buscadas"). Si no hay suficientes coincidencias reales, se generan matches dummy en base al inventario real.
+4. **Intercambio:** En `MatchDetailScreen`, al aceptar, se genera un código único (`FIG-XXXX-KX`), se asigna un kiosco de la base de datos relacional y se inserta en `intercambios`. Se navega a `CodeScreen` (modal raíz).
+5. **Mapa:** `MapScreen` consulta dinámicamente la tabla `kioscos` de Supabase para renderizar en tiempo real los comercios activos (actualmente 6). Permite redireccionar al usuario a Google Maps mediante enlaces externos.
+6. **Notificaciones y Estadísticas Reactivas:** La cabecera compartida (`AppHeader.tsx`) recibe la cantidad de matches pendientes por prop (`pendingNotificationsCount`), evitando crashes de contexto de navegación en web. Las pantallas consultan reactivamente a la base de datos de Supabase en base al estado del enfoque (`useFocusEffect`) y propagan el conteo hacia la cabecera. La pantalla principal (`HomeScreen`) carga en tiempo real el progreso de figuritas del usuario.
 
 ## Decisiones arquitectónicas
-- **Expo (managed workflow):** Permite iterar rápido sin compilaciones nativas, ideal para el alcance del MVP.
-- **Supabase:** Unifica autenticación, base de datos relacional y almacenamiento, simplificando la infraestructura.
-- **CodeScreen como modal raíz:** Evita que esta pantalla contamine el stack de navegación de la pestaña Matches, resolviendo un problema de flujo detectado con teoría de grafos.
-- **Mapeo local + API externa:** Reduce la dependencia de la API para datos estáticos (selección, dorsal) y la usa solo para nombre oficial y foto.
-- **Componentes atómicos reutilizables:** Garantizan coherencia visual y facilitan el desarrollo paralelo por tres integrantes sin conflictos .
+- **Expo (managed workflow):** Permite iterar rápido sin compilaciones nativas.
+- **Supabase:** Unifica autenticación, base de datos relacional y almacenamiento de fotos, simplificando la infraestructura.
+- **Cabecera Prop-Driven**: Desacopla la cabecera del ciclo de vida del router nativo para garantizar compatibilidad multiplataforma (Web y Móvil) y prevenir fallos de contexto de navegación.
+- **Generación Determinística de Números**: Reemplaza el ingreso de números manual o mapeo rígido por un hash de texto, manteniendo compatibilidad con la estructura de la base de datos y mejorando la UX al agregar figuritas por nombre.
+- **CodeScreen como modal raíz:** Evita que esta pantalla contamine el stack de navegación de la pestaña Matches.
+- **Ubicación Autónoma en Perfil**: Permite a los usuarios seleccionar un barrio oficial de Catamarca para calcular de forma local la distancia estimada en los matches.

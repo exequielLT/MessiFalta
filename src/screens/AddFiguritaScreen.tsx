@@ -20,10 +20,13 @@ import { searchPlayer } from '../services/api';
 import { buildPlayerImageFileName, uploadPlayerImage } from '../services/storageService';
 import { figuritasService } from '../services/figuritasService';
 import { useAuth } from '@/context/AuthContext';
+import { Figurita } from '../types';
 
 interface AddFiguritaScreenProps {
   onClose?: () => void;
+  figurita?: Figurita;
 }
+
 
 const formatNationality = (value?: string | null) => {
   if (!value) return null;
@@ -43,15 +46,16 @@ const generateNumberFromName = (name: string): number => {
   return (Math.abs(hash) % 678) + 1;
 };
 
-export const AddFiguritaScreen: React.FC<AddFiguritaScreenProps> = ({ onClose }) => {
+export const AddFiguritaScreen: React.FC<AddFiguritaScreenProps> = ({ onClose, figurita }) => {
   const router = useRouter();
   const { user } = useAuth();
   const theme = useTheme();
 
-  const [nombre, setNombre] = useState('');
-  const [tipo, setTipo] = useState<'repetida' | 'faltante' | null>(null);
-  const [nacionalidad, setNacionalidad] = useState('');
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [nombre, setNombre] = useState(figurita?.nombre_jugador || '');
+  const [tipo, setTipo] = useState<'repetida' | 'faltante' | null>(figurita?.tipo || null);
+  const [nacionalidad, setNacionalidad] = useState(figurita?.seleccion || '');
+  const [imageUrl, setImageUrl] = useState<string | null>(figurita?.imagen_url || null);
+
 
   const [saving, setSaving] = useState(false);
   const [searching, setSearching] = useState(false);
@@ -179,14 +183,24 @@ export const AddFiguritaScreen: React.FC<AddFiguritaScreenProps> = ({ onClose })
         }
       }
 
-      await figuritasService.createFigurita({
-        userId: user.id,
-        numero: generatedNum,
-        tipo,
-        nombreJugador: nombre.trim(),
-        imagenUrl: finalImageUrl,
-        seleccion: nacionalidad.trim(),
-      });
+      if (figurita) {
+        await figuritasService.updateFigurita(figurita.id, {
+          numero: generatedNum,
+          tipo,
+          nombreJugador: nombre.trim(),
+          imagenUrl: finalImageUrl,
+          seleccion: nacionalidad.trim(),
+        });
+      } else {
+        await figuritasService.createFigurita({
+          userId: user.id,
+          numero: generatedNum,
+          tipo,
+          nombreJugador: nombre.trim(),
+          imagenUrl: finalImageUrl,
+          seleccion: nacionalidad.trim(),
+        });
+      }
 
       if (onClose) {
         onClose();
@@ -211,7 +225,9 @@ export const AddFiguritaScreen: React.FC<AddFiguritaScreenProps> = ({ onClose })
         <TouchableOpacity onPress={() => (onClose ? onClose() : router.back())} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={theme.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>Agregar figurita</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>
+          {figurita ? 'Editar figurita' : 'Agregar figurita'}
+        </Text>
         <View style={{ width: 24 }} />
       </View>
 

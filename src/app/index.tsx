@@ -1,24 +1,85 @@
-import React from 'react';
-import { StyleSheet, ScrollView, View, Pressable } from 'react-native';
-import { useRouter } from 'expo-router';
+import React, { useState, useCallback } from 'react';
+import { StyleSheet, ScrollView, View, Pressable, ActivityIndicator } from 'react-native';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useTheme } from '@/hooks/use-theme';
 import { Spacing } from '@/constants/theme';
 import AppHeader from '@/components/AppHeader';
-
+import { useAuth } from '@/context/AuthContext';
+import { figuritasService } from '@/services/figuritasService';
+import { matchesService } from '@/services/matchesService';
+import { supabase } from '@/services/supabase';
 export default function HomeScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const { user } = useAuth() as any;
 
-  // Mock data for the MVP dashboard
-  const totalFiguritas = 400;
-  const myFiguritasCount = 312;
+  const [loading, setLoading] = useState(true);
+  const [myFiguritasCount, setMyFiguritasCount] = useState(0);
+  const [missingCount, setMissingCount] = useState(0);
+  const [duplicateCount, setDuplicateCount] = useState(0);
+  const [pendingMatches, setPendingMatches] = useState(0);
+  const [kioscosCount, setKioscosCount] = useState(0);
+
+  const totalFiguritas = 678;
+
+  const loadStats = useCallback(async () => {
+    if (!user?.id) return;
+    setLoading(true);
+    try {
+      // 1. Obtener todas las figuritas del usuario
+      const userFiguritas = await figuritasService.getFiguritas(user.id);
+      
+      const missing = userFiguritas.filter(f => f.tipo === 'faltante').length;
+      const duplicates = userFiguritas.filter(f => f.tipo === 'repetida').length;
+      
+      // La cantidad total conseguida (pasted in album) es el total menos las faltantes
+      const owned = totalFiguritas - missing;
+
+      setMyFiguritasCount(owned);
+      setMissingCount(missing);
+      setDuplicateCount(duplicates);
+
+      // 2. Obtener matches potenciales pendientes
+      const matchesData = await matchesService.getMatches(user.id);
+      setPendingMatches(matchesData.length);
+
+      // 3. Obtener cantidad de kioscos activos
+      const { count: kCount, error: kErr } = await supabase
+        .from('kioscos')
+        .select('*', { count: 'exact', head: true })
+        .eq('activo', true);
+      
+      if (!kErr && kCount !== null) {
+        setKioscosCount(kCount);
+      }
+    } catch (err) {
+      console.error('Error al cargar estadísticas en HomeScreen:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadStats();
+    }, [loadStats])
+  );
+
   const percentage = Math.round((myFiguritasCount / totalFiguritas) * 100);
-  const missingCount = totalFiguritas - myFiguritasCount; // 88
-  const duplicateCount = 23;
-  const pendingMatches = 2;
+
+  if (loading) {
+    return (
+      <ThemedView style={styles.rootContainer}>
+        <AppHeader pendingNotificationsCount={0} />
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={theme.primary} />
+        </View>
+      </ThemedView>
+    );
+  }
 
   return (
     <ThemedView style={styles.rootContainer}>
@@ -163,7 +224,7 @@ export default function HomeScreen() {
           </View>
           
           <ThemedText type="bodyMd" style={[styles.kioskSubtitle, { color: theme.onSurfaceVariant }]}>
-            Hay 3 kioscos adheridos en San Fernando del Valle de Catamarca listos como puntos de canje.
+            Hay {kioscosCount} kioscos adheridos en San Fernando del Valle de Catamarca listos como puntos de canje.
           </ThemedText>
 
           {/* Premium Map Placeholder */}

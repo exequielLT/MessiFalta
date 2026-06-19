@@ -46,5 +46,40 @@ export const figuritasService = {
     }
 
     return data;
+  },
+
+  async updateFigurita(id: string, input: Partial<CreateFiguritaInput>): Promise<Figurita> {
+    const { data, error } = await supabase
+      .from('figuritas')
+      .update({
+        numero: input.numero,
+        tipo: input.tipo,
+        nombre_jugador: input.nombreJugador,
+        imagen_url: input.imagenUrl,
+        seleccion: input.seleccion,
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating figurita:', error);
+      throw error;
+    }
+
+    return data;
+  },
+
+  async deleteFigurita(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('figuritas')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting figurita:', error);
+      throw error;
+    }
   }
 };
+

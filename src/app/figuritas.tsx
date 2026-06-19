@@ -1,4 +1,5 @@
 import AppHeader from '@/components/AppHeader';
+import { matchesService } from '@/services/matchesService';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
@@ -10,6 +11,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import React, { Suspense, useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   Modal,
@@ -74,7 +76,11 @@ export default function FiguritasScreen() {
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<FilterType>('todas');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedFigurita, setSelectedFigurita] = useState<Figurita | undefined>(undefined);
+  const [showActionsModal, setShowActionsModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [page, setPage] = useState(1);
+  const [pendingMatches, setPendingMatches] = useState(0);
 
   const { user } = useAuth() as any;
 
@@ -85,6 +91,13 @@ export default function FiguritasScreen() {
       const { figuritasService } = await import('@/services/figuritasService');
       const data = await figuritasService.getFiguritas(user.id);
       setFiguritas(data);
+
+      try {
+        const matchesData = await matchesService.getMatches(user.id);
+        setPendingMatches(matchesData.length);
+      } catch (matchesErr) {
+        console.error('Error fetching matches in FiguritasScreen:', matchesErr);
+      }
     } catch (error) {
       console.error(error);
     } finally {
@@ -128,6 +141,7 @@ export default function FiguritasScreen() {
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   const handleAddFigurita = () => {
+    setSelectedFigurita(undefined);
     setShowAddModal(true);
   };
 
@@ -135,11 +149,16 @@ export default function FiguritasScreen() {
     router.push('/matches');
   };
 
+  const handleCardPress = (figurita: Figurita) => {
+    setSelectedFigurita(figurita);
+    setShowActionsModal(true);
+  };
+
   // ── Empty state ───────────────────────────────────────────────────────────
   if (!loading && figuritas.length === 0) {
     return (
       <ThemedView style={styles.root}>
-        <AppHeader />
+      <AppHeader pendingNotificationsCount={pendingMatches} />
         <View style={[styles.emptyContainer, { backgroundColor: theme.surfaceContainerLowest }]}>
           {/* Ilustración */}
           <View style={styles.illustrationWrapper}>
@@ -182,10 +201,17 @@ export default function FiguritasScreen() {
           visible={showAddModal}
           animationType="slide"
           presentationStyle="fullScreen"
-          onRequestClose={() => setShowAddModal(false)}
+          onRequestClose={() => { setShowAddModal(false); setSelectedFigurita(undefined); }}
         >
           <Suspense fallback={<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background }}><ActivityIndicator size="large" color={theme.primary} /></View>}>
-            <AddFiguritaWrapper onClose={() => { setShowAddModal(false); loadFiguritas(); }} />
+            <AddFiguritaWrapper
+              onClose={() => {
+                setShowAddModal(false);
+                setSelectedFigurita(undefined);
+                loadFiguritas();
+              }}
+              figurita={selectedFigurita}
+            />
           </Suspense>
         </Modal>
       </ThemedView>
@@ -195,7 +221,7 @@ export default function FiguritasScreen() {
   // ── Vista principal con datos ─────────────────────────────────────────────
   return (
     <ThemedView style={styles.root}>
-      <AppHeader />
+      <AppHeader pendingNotificationsCount={pendingMatches} />
 
       <FlatList
         data={displayedFiguritas}
@@ -278,7 +304,13 @@ export default function FiguritasScreen() {
             </ScrollView>
           </View>
         }
-        renderItem={({ item }) => <FiguritaCard figurita={item} theme={theme} />}
+        renderItem={({ item }) => (
+          <FiguritaCard
+            figurita={item}
+            theme={theme}
+            onPress={() => handleCardPress(item)}
+          />
+        )}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListEmptyComponent={
           <View style={styles.filterEmptyContainer}>
@@ -328,11 +360,148 @@ export default function FiguritasScreen() {
         visible={showAddModal}
         animationType="slide"
         presentationStyle="fullScreen"
-        onRequestClose={() => setShowAddModal(false)}
+        onRequestClose={() => { setShowAddModal(false); setSelectedFigurita(undefined); }}
       >
         <Suspense fallback={<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background }}><ActivityIndicator size="large" color={theme.primary} /></View>}>
-          <AddFiguritaWrapper onClose={() => { setShowAddModal(false); loadFiguritas(); }} />
+          <AddFiguritaWrapper
+            onClose={() => {
+              setShowAddModal(false);
+              setSelectedFigurita(undefined);
+              loadFiguritas();
+            }}
+            figurita={selectedFigurita}
+          />
         </Suspense>
+      </Modal>
+
+      {/* ── Sticker Actions Modal (Edit/Delete) ─────────────────────────────── */}
+      <Modal
+        visible={showActionsModal}
+        animationType="fade"
+        transparent
+        statusBarTranslucent
+        onRequestClose={() => setShowActionsModal(false)}
+      >
+        <View style={styles.confirmOverlay}>
+          <View style={[styles.confirmCard, { backgroundColor: theme.surface }]}>
+            {/* Header Icon */}
+            <View style={[styles.confirmIconBg, { backgroundColor: theme.primaryContainer }]}>
+              <Ionicons name="copy-outline" size={24} color={theme.primary} />
+            </View>
+
+            {/* Title / Info */}
+            <View style={styles.confirmContent}>
+              <ThemedText type="headlineSm" style={[styles.confirmTitle, { color: theme.onSurface }]}>
+                Figurita Nº {selectedFigurita?.numero}
+              </ThemedText>
+              <ThemedText type="bodyMd" style={[styles.confirmDescription, { color: theme.onSurfaceVariant }]}>
+                {selectedFigurita?.nombre_jugador || 'Sin nombre'} · {selectedFigurita?.tipo === 'repetida' ? 'Repetida' : 'Faltante'}
+              </ThemedText>
+            </View>
+
+            {/* Actions List */}
+            <View style={styles.confirmActionsContainer}>
+              <TouchableOpacity
+                style={[styles.actionBtn, { backgroundColor: theme.primary }]}
+                onPress={() => {
+                  setShowActionsModal(false);
+                  setShowAddModal(true);
+                }}
+                activeOpacity={0.8}
+              >
+                <ThemedText style={styles.actionBtnText}>Editar figurita</ThemedText>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.actionBtn, { backgroundColor: theme.error }]}
+                onPress={() => {
+                  setShowActionsModal(false);
+                  setShowDeleteConfirm(true);
+                }}
+                activeOpacity={0.8}
+              >
+                <ThemedText style={styles.actionBtnText}>Eliminar figurita</ThemedText>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.confirmBtnCancel, { backgroundColor: theme.surfaceContainerHigh }]}
+                onPress={() => {
+                  setShowActionsModal(false);
+                  setSelectedFigurita(undefined);
+                }}
+                activeOpacity={0.8}
+              >
+                <ThemedText style={[styles.confirmBtnCancelText, { color: theme.onSurfaceVariant }]}>
+                  Cancelar
+                </ThemedText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Delete Confirmation Modal ─────────────────────────────── */}
+      <Modal
+        visible={showDeleteConfirm}
+        animationType="fade"
+        transparent
+        statusBarTranslucent
+        onRequestClose={() => setShowDeleteConfirm(false)}
+      >
+        <View style={styles.confirmOverlay}>
+          <View style={[styles.confirmCard, { backgroundColor: theme.surface }]}>
+            {/* Trash Icon */}
+            <View style={[styles.confirmIconBg, { backgroundColor: theme.errorContainer }]}>
+              <Ionicons name="trash-outline" size={24} color={theme.error} />
+            </View>
+
+            {/* Content */}
+            <View style={styles.confirmContent}>
+              <ThemedText type="headlineSm" style={[styles.confirmTitle, { color: theme.onSurface }]}>
+                ¿Eliminar figurita?
+              </ThemedText>
+              <ThemedText type="bodyMd" style={[styles.confirmDescription, { color: theme.onSurfaceVariant }]}>
+                ¿Estás seguro de que querés eliminar la figurita de {selectedFigurita?.nombre_jugador || `Nº ${selectedFigurita?.numero}`}? Esta acción no se puede deshacer.
+              </ThemedText>
+            </View>
+
+            {/* Actions */}
+            <View style={styles.confirmActionsContainer}>
+              <TouchableOpacity
+                style={[styles.confirmBtnConfirm, { backgroundColor: theme.error }]}
+                onPress={async () => {
+                  if (selectedFigurita) {
+                    try {
+                      const { figuritasService } = await import('@/services/figuritasService');
+                      await figuritasService.deleteFigurita(selectedFigurita.id);
+                      setShowDeleteConfirm(false);
+                      setSelectedFigurita(undefined);
+                      await loadFiguritas();
+                    } catch (e) {
+                      Alert.alert('Error', 'No se pudo eliminar la figurita.');
+                    }
+                  }
+                }}
+                activeOpacity={0.8}
+              >
+                <ThemedText style={styles.confirmBtnConfirmText}>Sí, eliminar</ThemedText>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.confirmBtnCancel, { backgroundColor: theme.surfaceContainerHigh }]}
+                onPress={() => {
+                  setShowDeleteConfirm(false);
+                  setSelectedFigurita(undefined);
+                }}
+                activeOpacity={0.8}
+              >
+                <ThemedText style={[styles.confirmBtnCancelText, { color: theme.onSurfaceVariant }]}>
+                  Cancelar
+                </ThemedText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
     </ThemedView>
   );
@@ -342,9 +511,10 @@ export default function FiguritasScreen() {
 interface FiguritaCardProps {
   figurita: Figurita;
   theme: ReturnType<typeof useTheme>;
+  onPress?: () => void;
 }
 
-function FiguritaCard({ figurita, theme }: FiguritaCardProps) {
+function FiguritaCard({ figurita, theme, onPress }: FiguritaCardProps) {
   const isRepetida = figurita.tipo === 'repetida';
 
   // Colores del círculo: verde para repetidas, terciario (naranja) para faltantes
@@ -357,7 +527,9 @@ function FiguritaCard({ figurita, theme }: FiguritaCardProps) {
   const badgeLabel = isRepetida ? 'Repetida' : 'Faltante';
 
   return (
-    <View
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={onPress ? 0.7 : 1}
       style={[
         styles.card,
         {
@@ -392,7 +564,7 @@ function FiguritaCard({ figurita, theme }: FiguritaCardProps) {
           </ThemedText>
         </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -615,5 +787,94 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.35,
     shadowRadius: 12,
     elevation: 8,
+  },
+
+  // ── Modal de Confirmación / Acciones ──
+  confirmOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 50,
+    padding: 16,
+  },
+  confirmCard: {
+    width: '100%',
+    maxWidth: 330,
+    borderRadius: 24,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  confirmIconBg: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  confirmContent: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  confirmTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  confirmDescription: {
+    fontSize: 15,
+    fontWeight: '400',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  confirmActionsContainer: {
+    width: '100%',
+    gap: 12,
+  },
+  actionBtn: {
+    width: '100%',
+    height: 50,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  actionBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  confirmBtnConfirm: {
+    width: '100%',
+    height: 50,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  confirmBtnConfirmText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  confirmBtnCancel: {
+    width: '100%',
+    height: 50,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  confirmBtnCancelText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

@@ -39,6 +39,20 @@ function LayoutContent() {
     checkState();
   }, []);
 
+  useEffect(() => {
+    if (!user) {
+      const checkOnboarding = async () => {
+        try {
+          const hasSeenOnboarding = await AsyncStorage.getItem('has_seen_onboarding');
+          setShowOnboarding(hasSeenOnboarding !== 'true');
+        } catch (error) {
+          console.error('Error checking onboarding on auth state change:', error);
+        }
+      };
+      checkOnboarding();
+    }
+  }, [user]);
+
   const handleFinishOnboarding = () => {
     setShowOnboarding(false);
   };

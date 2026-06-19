@@ -66,17 +66,17 @@ MVP con autenticación Supabase, base de datos real, almacenamiento de imágenes
 - **Datos utilizados:** `player.name` (nombre oficial) y `player.photo` (imagen cacheada en Supabase Storage).
 - **Datos NO utilizados:** selección, dorsal, logo de selección (vienen del mapeo local).
 - **Flujo en `AddFiguritaScreen`:**
-  1. Usuario ingresa número. Debounce de 800ms.
-  2. Si el número está en `playerMapping.ts`, se usa el nombre mapeado para llamar a `searchPlayer(nombre)`.
-  3. Si la API devuelve foto, se descarga y se sube a Supabase Storage.
-  4. Estados:
+  1. Usuario ingresa el nombre del jugador. Debounce de 800ms.
+  2. Se realiza una búsqueda debounceada llamando a `searchPlayer(nombre)` en `api.ts`.
+  3. Si la API devuelve foto y nacionalidad, se autocompleta el campo de selección.
+  4. Al guardar, si la foto provista es externa, se descarga y se sube a Supabase Storage con un nombre formateado.
+  5. Se genera un número de figurita determinístico (1-678) mediante un algoritmo de hash basado en el nombre del jugador para mantener la compatibilidad con el sistema de matchmaking.
+  6. Estados:
      - **Carga:** `ActivityIndicator` a la derecha del campo nombre.
-     - **Éxito:** autocompletar con `player.name`, mostrar check verde 2s, foto guardada en Storage.
-     - **Vacío:** "Jugador no encontrado. Podés guardarlo sin nombre."
-     - **Error:** "No se pudo obtener el nombre/imagen. ¿Reintentar?" + botón.
-  5. Si el número no está en el mapeo, el usuario puede escribir el nombre manualmente.
-  6. Se permite guardar la figurita sin nombre y sin imagen si la API falla.
-  7. Flag `userEditedName`: si el usuario modifica manualmente el campo después del autocompletado, no se vuelve a sobrescribir.
+     - **Éxito:** autocompletar con la nacionalidad de la API, mostrar check verde 2s, foto guardada en Storage al presionar Guardar.
+     - **Vacío:** "Jugador no encontrado. Podés guardarlo igual."
+     - **Error:** "No se pudo buscar en la API. ¿Reintentar?" + botón.
+  7. Se permite al usuario ingresar nombre y nacionalidad manualmente si la API no encuentra resultados o falla.
 - **Rate limit:** si 429, mostrar "Demasiadas búsquedas. Esperá un minuto."
 
 ## 🧭 Navegación (grafo corregido)
@@ -97,12 +97,12 @@ MVP con autenticación Supabase, base de datos real, almacenamiento de imágenes
 - **StatusScreen:** `loading`, `empty`, `error`. Título, descripción, botón opcional.
 
 ## 🧪 Lógica específica por pantalla
-- **Home:** el botón "Buscar coincidencias" se habilita si hay ≥1 repetida y ≥1 faltante en el array completo, no en el filtrado. Filtro por chips solo afecta a la lista mostrada. Paginación de 20 figuritas.
-- **Matches:** la búsqueda por texto busca siempre en `userName`, `offeredFigurita.number` y `requestedFigurita.number`. Los chips solo filtran el tipo de coincidencia (todas, ofrecidas, buscadas). Paginación de 20 matches.
-- **AddFigurita:** validación de rango (1-678) con mensaje de error. Debounce en búsqueda API. Flag `userEditedName` para no sobrescribir edición manual.
-- **MatchDetail → Code:** navegación a modal raíz; no se puede volver atrás al MatchDetail una vez aceptado.
-- **Mapa:** 3 kioscos hardcodeados (Catamarca). Si `kioscoId` viene en params, destaca ese marcador en verde.
-- **Perfil:** logout limpia AsyncStorage y fuerza redirección a Login.
+- **Home (Inicio):** El botón "Buscar coincidencias" se habilita si hay ≥1 repetida y ≥1 faltante en el array completo. Muestra estadísticas dinámicas en tiempo real (progreso, repetidas, faltantes, matches pendientes) consultadas de Supabase mediante `useFocusEffect`. También muestra el número dinámico de kioscos activos.
+- **Matches:** La búsqueda por texto busca en `userName`, en `offeredFigurita.nombre_jugador` / `number` y `requestedFigurita.nombre_jugador` / `number`. Los chips filtran correctamente la coincidencia: "ofrecidas" (figuritas que otros ofrecen y yo busco) y "buscadas" (figuritas que yo tengo repetidas y otros buscan). Paginación de 20 matches.
+- **AddFigurita:** Búsqueda reactiva por nombre del jugador en API Football (con debounce de 800ms). Se genera un número determinístico (1-678) mediante hash del nombre del jugador. Si el jugador no es encontrado, se permite el guardado con ingreso manual de nombre y nacionalidad.
+- **MatchDetail → Code:** Navegación a modal raíz; no se puede volver atrás al MatchDetail una vez aceptado.
+- **Mapa:** Consulta dinámicamente de Supabase los kioscos activos (actualmente 6 marcadores). Si `kioscoId` viene en params, destaca ese marcador en verde. Soporta redirección nativa con Google Maps al presionar "Cómo llegar".
+- **Perfil:** Permite editar el nombre y el barrio (ubicación) del usuario con una lista de autocompletado para barrios válidos de Catamarca. Muestra historial detallado de intercambios y reputación en base a transacciones exitosas. Carga matches pendientes reales para la cabecera. El logout limpia AsyncStorage y redirige a Login.
 
 ## 📄 Documentación
 - `README.md`: descripción, stack, ejecución, variables de entorno, capturas.

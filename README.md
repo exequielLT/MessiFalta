@@ -40,20 +40,26 @@ Esta primera versión implementa el camino crítico funcional del producto:
 * **Almacenamiento en la nube (Supabase Storage):**
   * Bucket `jugadores` para el almacenamiento y caché de las fotos de los futbolistas obtenidas desde la API externa, evitando consumos excesivos de requests.
 * **CRUD de figuritas (Inventario):**
-  * Registro indicando el número (1-678), tipo (`repetida` en verde / `faltante` en naranja), selección, nombre del jugador e imagen.
-  * Soporte de guardado manual si la API no está disponible o el jugador no figura en el mapeo.
+  * Registro indicando el nombre del jugador (con debounce e integración con API Football). La selección se autocompleta y la imagen del jugador se previsualiza y sube a Supabase Storage. El número se genera de forma determinística en base al hash del nombre.
+  * Soporte de guardado manual ingresando nombre y selección si la API no está disponible o el jugador no figura en el sistema de búsqueda.
 * **Sistema inteligente de coincidencias (Matches):**
   * Generación dinámica de matches cruzando las repetidas del usuario actual con las faltantes de otros usuarios (y viceversa).
+  * Filtrado correcto bidireccional ("ofrecidas" y "buscadas").
   * En ausencia de datos reales suficientes, el sistema genera matches de simulación dummy dinámicos basados directamente en el inventario real del usuario.
 * **Flujo de intercambio digital:**
-  * Visualización del detalle del match, distancia y confirmación.
+  * Visualización del detalle del match, distancia calculada en base al barrio del usuario y confirmación.
   * Generación de código único formateado (`FIG-XXXX-KX`) e inserción del registro de intercambio.
   * Pantalla de intercambio con QR generado dinámicamente e instrucciones claras.
 * **Mapa interactivo de kioscos:**
-  * Visualización de 3 puntos reales de kioscos ubicados en Catamarca con marcadores personalizados (`react-native-maps`).
+  * Consulta en tiempo real de la base de datos para mostrar los kioscos activos (6 marcadores ubicados en Catamarca) utilizando marcadores personalizados.
   * Integración con el flujo de canje: al presionar "Ver en mapa" desde la pantalla de código de intercambio, se destaca en verde el marcador del kiosco asignado.
+  * Integración de redirección de mapas nativos ("Cómo llegar").
 * **Perfil de usuario:**
-  * Resumen de datos, reputación simulada (en base a cantidad de intercambios) e historial de transacciones realizadas.
+  * Resumen de datos, reputación calculada a partir de transacciones exitosas, e historial de transacciones realizadas en un modal de fácil acceso.
+  * Edición del perfil (nombre y barrio de ubicación actual) con soporte de autocompletado para barrios válidos de Catamarca.
+* **Cabecera Dinámica y Estadísticas:**
+  * La pantalla de Inicio (`HomeScreen`) calcula de forma reactiva al enfocarse (`useFocusEffect`) el progreso de colección del usuario, cantidad de repetidas, faltantes, matches pendientes y comercios adheridos de forma verídica desde Supabase.
+  * La cabecera compartida actualiza en tiempo real las alertas de matches pendientes para el usuario en todas las pestañas.
 
 ---
 
@@ -131,10 +137,10 @@ npx expo start
   ```
 
 ### Detalles del flujo y cacheo en el MVP
-1. **Debounce:** Cuando el usuario escribe el número de figurita en `AddFiguritaScreen`, se espera un debounce de 800ms antes de consultar el nombre del jugador para mitigar la cantidad de peticiones concurrentes.
-2. **Mapeo local:** Se utiliza un mapeo estático (`playerMapping.ts`) para asociar números con nombres y banderas locales de las 32 selecciones (guardadas en `assets/banderas/`). Si el número existe en este mapa, se usa el nombre predefinido para llamar a la API.
-3. **Descarga y caché en Storage:** La API devuelve la URL oficial de la imagen del jugador (`player.photo`). El servicio `storageService` descarga esta imagen y la sube al bucket `jugadores` de Supabase Storage bajo el nombre `{numero}-{nombre_sanitizado}.png`. Si el archivo ya existe en el bucket, no se vuelve a subir, actuando como una red de entrega y caché que ahorra consumo de API.
-4. **Resiliencia:** Si la API devuelve un resultado vacío, la aplicación permite al usuario guardar la figurita sin nombre e ingresar el nombre de forma manual. Si hay un límite de peticiones (código 429) o un error de red, se muestra un mensaje descriptivo con la opción de reintentar.
+1. **Debounce:** Cuando el usuario escribe el nombre del jugador en `AddFiguritaScreen`, se aplica un debounce de 800ms antes de consultar a la API para mitigar la cantidad de peticiones concurrentes.
+2. **Generación Determinística de Números:** En vez de exigir que el usuario ingrese un número del 1 al 678, el sistema calcula de forma transparente un número entero determinístico en base al hash del nombre del jugador para mapear su posición relacional en el álbum y poder realizar matchmaking.
+3. **Descarga y caché en Storage:** Al guardar la figurita, si la API devolvió la URL de una foto del jugador (`player.photo`), el servicio `storageService` descarga esta imagen y la sube al bucket `jugadores` de Supabase Storage bajo el nombre `{numero}-{nombre_sanitizado}.png`. Si el archivo ya existe en el bucket, no se reemplaza.
+4. **Resiliencia:** Si la API devuelve un resultado vacío o falla, la aplicación permite al usuario guardar la figurita ingresando el nombre y la selección de forma manual. Si hay un límite de peticiones (código 429) o error de red, se alerta al usuario ofreciendo guardar manualmente o reintentar la búsqueda.
 
 ---
 

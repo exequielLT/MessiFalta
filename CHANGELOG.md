@@ -7,11 +7,19 @@
 # 📝 Changelog – FiguMatch
 
 ## [M4] – Verificación y entrega (2026-06-19)
+### Feat
+- **Búsqueda por Nombre**: Reemplazada la búsqueda e ingreso manual de números en `AddFiguritaScreen` por búsqueda debounceada de 800ms por nombre del jugador, autocompletado de selección y generación de números determinísticos vía hash para matchmaking.
+- **Estadísticas Reales en Inicio**: La pantalla `HomeScreen` carga de forma dinámica el progreso total de la colección, figuritas faltantes, repetidas, matches pendientes y conteo de kioscos activos conectándose reactivamente con Supabase (`useFocusEffect`).
+- **Alertas de matches dinámicas**: Configuración de `AppHeader.tsx` para recibir alertas y badges de matches activos de manera reactiva por props, previniendo crashes de contexto en entornos web.
+- **Barrios de Catamarca**: Añadida la edición del perfil de usuario y barrio actual utilizando listas de autocompletado con barrios oficiales de Catamarca para el cálculo local de distancias.
+- **Kioscos dinámicos**: Ampliada la lista de kioscos del mapa para consultar la base de datos Supabase en tiempo real (mostrando 6 marcadores activos).
+- **Inversión de filtro**: Solucionado el problema de filtrado de coincidencias en `MatchesScreen` invirtiendo los cruces de figuritas ofrecidas y buscadas.
 ### Docs
-- README completo con instrucciones de instalación, variables y limitaciones.
+- README completo y especificaciones actualizadas con la lógica por nombre, estadísticas en tiempo real y mapa de kioscos dinámico.
 - Reflexión final del equipo sobre el TP4.
 ### Tests
 - Pruebas manuales del camino feliz y 5 caminos alternativos.
+- Validación de compilación en Strict Mode (`npx tsc --noEmit`).
 ### Demo
 - Video de 5 minutos mostrando flujo completo y estados alternativos.
 
