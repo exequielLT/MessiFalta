@@ -129,7 +129,8 @@ export default function MatchesScreen() {
     setShowConfirmModal(true);
   };
 
-  const handleConfirmExchange = () => {
+  const handleConfirmExchange = async () => {
+    if (!selectedMatch) return;
     setShowConfirmModal(false);
     
     // Generate a simulated unique code in format FIG-XXXX-XX (e.g. FIG-8472-K9)
@@ -139,8 +140,22 @@ export default function MatchesScreen() {
     const randomChar2 = chars.charAt(Math.floor(Math.random() * chars.length));
     const code = `FIG-${randomNum}-${randomChar1}${randomChar2}`;
     
-    setGeneratedCode(code);
-    setModalView('code');
+    const success = await matchesService.confirmExchange(
+      selectedMatch.figuritaMiaId,
+      selectedMatch.figuritaAjenaId,
+      selectedMatch.kioscoId,
+      code
+    );
+
+    if (success) {
+      setGeneratedCode(code);
+      setModalView('code');
+      // Recargar la lista de matches para ocultar el aceptado
+      loadMatches();
+    } else {
+      console.error('No se pudo guardar el intercambio en la base de datos');
+      alert('Error al guardar el intercambio');
+    }
   };
 
   const handleShare = async () => {
