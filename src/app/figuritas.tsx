@@ -29,7 +29,7 @@ type FilterType = 'todas' | 'repetidas' | 'faltantes';
 // ─── Datos de prueba (mock) — se reemplazarán con Supabase ────────────────────
 const MOCK_FIGURITAS: Figurita[] = [
   {
-    id: 1,
+    id: 'mock-1',
     user_id: 'mock',
     numero: 128,
     tipo: 'repetida',
@@ -37,7 +37,7 @@ const MOCK_FIGURITAS: Figurita[] = [
     created_at: '',
   },
   {
-    id: 2,
+    id: 'mock-2',
     user_id: 'mock',
     numero: 45,
     tipo: 'repetida',
@@ -45,7 +45,7 @@ const MOCK_FIGURITAS: Figurita[] = [
     created_at: '',
   },
   {
-    id: 3,
+    id: 'mock-3',
     user_id: 'mock',
     numero: 210,
     tipo: 'faltante',
@@ -53,7 +53,7 @@ const MOCK_FIGURITAS: Figurita[] = [
     created_at: '',
   },
   {
-    id: 4,
+    id: 'mock-4',
     user_id: 'mock',
     numero: 88,
     tipo: 'repetida',

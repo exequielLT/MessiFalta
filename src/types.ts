@@ -2,7 +2,7 @@
  * Representa una figurita cargada por un usuario.
  */
 export interface Figurita {
-  id: number;
+  id: string;
   user_id: string;
   numero: number;
   tipo: 'repetida' | 'faltante';
@@ -19,8 +19,8 @@ export interface Match {
   id: number;
   user1_id: string;
   user2_id: string;
-  fig1_id: number;
-  fig2_id: number;
+  fig1_id: string;
+  fig2_id: string;
   estado: 'propuesto' | 'aceptado' | 'completado';
   usuario_nombre?: string;
   usuario_barrio?: string;
@@ -55,7 +55,7 @@ export interface Intercambio {
   kiosco_id: number;
   kiosco_nombre?: string;
   kiosco_direccion?: string;
-  estado: 'pendiente_entrega' | 'pendiente_retiro' | 'completado';
+  estado: 'pendiente' | 'retirado' | 'expirado' | 'cancelado';
   fecha_entrega?: string;
   fecha_retiro?: string;
 }
