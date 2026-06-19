@@ -24,7 +24,7 @@ export async function searchPlayer(name: string): Promise<{ data: SearchPlayerRe
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     const response = await fetch(
-      `https://v3.football.api-sports.io/players?season=2022&league=1&search=${encodeURIComponent(name)}`,
+      `https://v3.football.api-sports.io/players?season=2026&league=1&search=${encodeURIComponent(name)}`,
       {
         method: 'GET',
         headers: {
