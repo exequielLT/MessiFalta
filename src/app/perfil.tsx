@@ -1,52 +1,1230 @@
-import React from 'react';
-import { StyleSheet, ScrollView } from 'react-native';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import {
+  StyleSheet,
+  ScrollView,
+  View,
+  Alert,
+  Share,
+  Pressable,
+  Modal,
+  TextInput,
+  ActivityIndicator,
+  TouchableOpacity,
+  Text,
+  Image,
+} from 'react-native';
+import { useFocusEffect } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
+import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
+import { Button } from '@/components/Button';
+import AppHeader from '@/components/AppHeader';
+import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/services/supabase';
+import { matchesService } from '@/services/matchesService';
+
+// Storage keys
+const PROFILE_STORAGE_KEY = 'messifalta_user_profile';
+const USER_SESSION_KEY = 'user_session';
+const ONBOARDING_KEY = 'has_seen_onboarding';
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+interface UserProfile {
+  name: string;
+  email: string;
+  location: string;
+  rating: number;
+  totalTrades: number;
+  avatarUrl?: string;
+}
+
+interface TradeRecord {
+  id: string;
+  type: 'completed' | 'pending' | 'cancelled';
+  offered: string;
+  received: string;
+  date: string;
+  status: string;
+  partner?: string;
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function PerfilScreen() {
+  const theme = useTheme();
+  const { signOut, user } = useAuth() as any;
+
+  // ── State ────────────────────────────────────────────────────────────────
+
+  const [userProfile, setUserProfile] = useState<UserProfile>({
+    name: '',
+    email: '',
+    location: 'Sin ubicación',
+    rating: 0,
+    totalTrades: 0,
+  });
+  const [pendingMatches, setPendingMatches] = useState(0);
+
+  // Edit profile modal
+  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editLocation, setEditLocation] = useState('');
+  const [isNameFocused, setIsNameFocused] = useState(false);
+  const [isLocationFocused, setIsLocationFocused] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Logout confirmation modal
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  // Full History modal state
+  const [isHistoryModalVisible, setIsHistoryModalVisible] = useState(false);
+
+  // Autocomplete / suggestions states
+  const VALID_NEIGHBORHOODS = [
+    'Catamarca Centro',
+    'Villa Cubas',
+    'La Chacarita',
+    'La Tablada',
+    'Choya',
+    'Capital',
+  ];
+  const [searchingLocation, setSearchingLocation] = useState(false);
+  const [locationSuggestions, setLocationSuggestions] = useState<string[]>([]);
+  const locationSearchTimeoutRef = useRef<any>(null);
+
+  // ── Data ─────────────────────────────────────────────────────────────────
+
+  const [recentTrades, setRecentTrades] = useState<TradeRecord[]>([
+    {
+      id: 'mock-1',
+      type: 'completed',
+      offered: '128 - L. Messi',
+      received: '45 - E. Martínez',
+      date: '18/06/2026',
+      status: 'Completado',
+      partner: 'Lautaro Tapia',
+    },
+    {
+      id: 'mock-2',
+      type: 'completed',
+      offered: '88 - R. De Paul',
+      received: '210 - K. Mbappé',
+      date: '17/06/2026',
+      status: 'Completado',
+      partner: 'Graciela',
+    }
+  ]);
+
+  // ── Effects ──────────────────────────────────────────────────────────────
+
+  useFocusEffect(
+    useCallback(() => {
+      const loadProfile = async () => {
+        if (!user?.id) return;
+        try {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('nombre, email, reputacion, barrio')
+            .eq('id', user.id)
+            .single();
+            
+          if (data && !error) {
+            setUserProfile((prev) => ({
+              ...prev,
+              name: data.nombre || '',
+              email: data.email || user.email || '',
+              rating: data.reputacion || 0,
+              location: data.barrio || 'Sin ubicación',
+            }));
+          }
+
+          // Fetch location and avatarUrl from local storage as fallback/addition
+          const saved = await AsyncStorage.getItem(PROFILE_STORAGE_KEY);
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            setUserProfile((prev) => ({
+              ...prev,
+              location: data?.barrio || parsed.location || prev.location,
+              avatarUrl: parsed.avatarUrl || prev.avatarUrl,
+            }));
+          }
+
+          // Fetch confirmed matches
+          const { data: historyData, error: historyError } = await supabase.rpc('get_user_match_history');
+          if (historyData && !historyError) {
+            const mappedTrades: TradeRecord[] = historyData.map((row: any) => ({
+              id: String(row.match_id),
+              type: row.estado === 'completado' ? 'completed' : row.estado === 'cancelado' ? 'cancelled' : 'pending',
+              offered: `${row.offered_number} - ${row.offered_name}`,
+              received: `${row.received_number} - ${row.received_name}`,
+              date: new Date(row.created_at).toLocaleDateString('es-AR'),
+              status: row.estado === 'completado' ? 'Completado' : row.estado === 'cancelado' ? 'Cancelado' : 'Aceptado',
+              partner: row.partner_name || 'Usuario',
+            }));
+            setRecentTrades(mappedTrades);
+            
+            // Calculate total trades count (completed trades)
+            const completedCount = mappedTrades.filter((t) => t.type === 'completed').length;
+            setUserProfile((prev) => ({
+              ...prev,
+              totalTrades: completedCount,
+            }));
+          }
+
+          // Fetch pending matches count
+          try {
+            const matchesData = await matchesService.getMatches(user.id);
+            setPendingMatches(matchesData.length);
+          } catch (matchesErr) {
+            console.error('Error al obtener matches en PerfilScreen:', matchesErr);
+          }
+        } catch (e) {
+          console.error('Error al cargar perfil:', e);
+        }
+      };
+      loadProfile();
+    }, [user?.id])
+  );
+
+  // ── Handlers ─────────────────────────────────────────────────────────────
+
+  const handleEditProfilePress = () => {
+    setEditName(userProfile.name);
+    setEditLocation(userProfile.location);
+    setIsEditModalVisible(true);
+  };
+
+  const handleLocationChange = (text: string) => {
+    setEditLocation(text);
+    setLocationSuggestions([]);
+    
+    if (locationSearchTimeoutRef.current) {
+      clearTimeout(locationSearchTimeoutRef.current);
+    }
+
+    if (!text.trim()) {
+      setSearchingLocation(false);
+      return;
+    }
+
+    setSearchingLocation(true);
+    locationSearchTimeoutRef.current = setTimeout(() => {
+      const query = text.trim().toLowerCase();
+      if (query.length >= 2) {
+        const filtered = VALID_NEIGHBORHOODS.filter(
+          (b) => b.toLowerCase().includes(query) && b.toLowerCase() !== query
+        );
+        setLocationSuggestions(filtered);
+      }
+      setSearchingLocation(false);
+    }, 400);
+  };
+
+  const handleSelectSuggestion = (suggestion: string) => {
+    setEditLocation(suggestion);
+    setLocationSuggestions([]);
+    if (locationSearchTimeoutRef.current) {
+      clearTimeout(locationSearchTimeoutRef.current);
+    }
+  };
+
+  const isValidLocation = (text: string) => {
+    return VALID_NEIGHBORHOODS.some(
+      (b) => b.toLowerCase() === text.trim().toLowerCase()
+    );
+  };
+
+  const handleSaveProfile = async () => {
+    if (!editName.trim()) {
+      Alert.alert('Error', 'El nombre no puede estar vacío.');
+      return;
+    }
+    if (!editLocation.trim()) {
+      Alert.alert('Error', 'La ubicación no puede estar vacía.');
+      return;
+    }
+
+    const officialNeighborhood = VALID_NEIGHBORHOODS.find(
+      (b) => b.toLowerCase() === editLocation.trim().toLowerCase()
+    );
+
+    if (!officialNeighborhood) {
+      Alert.alert(
+        'Ubicación inválida',
+        'Por favor, ingresá o seleccioná un barrio válido de Catamarca (ej. Catamarca Centro, Villa Cubas, La Chacarita, La Tablada, Choya, Capital).'
+      );
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const updatedProfile = {
+        name: editName.trim(),
+        location: officialNeighborhood,
+        email: userProfile.email,
+        avatarUrl: userProfile.avatarUrl,
+      };
+
+      if (user?.id) {
+        const { error } = await supabase
+          .from('profiles')
+          .update({ 
+            nombre: editName.trim(),
+            barrio: officialNeighborhood
+          })
+          .eq('id', user.id);
+          
+        if (error) throw error;
+      }
+      await AsyncStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(updatedProfile));
+      setUserProfile((prev) => ({ ...prev, ...updatedProfile }));
+      setIsEditModalVisible(false);
+      Alert.alert('Éxito', 'Perfil actualizado correctamente.');
+    } catch {
+      Alert.alert('Error', 'No se pudo guardar el perfil. Intentá de nuevo.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleShareProfile = async () => {
+    try {
+      await Share.share({
+        message: `¡Mirá mi perfil de FiguMatch! Llevo ${userProfile.totalTrades} intercambios exitosos coleccionando el álbum del Mundial 2026.`,
+      });
+    } catch (error) {
+      console.error('Error al compartir perfil:', error);
+    }
+  };
+
+  const handleFullHistory = () => {
+    setIsHistoryModalVisible(true);
+  };
+
+  const handleAvatarPress = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (permissionResult.granted === false) {
+        Alert.alert('Permiso denegado', 'Necesitás dar permiso para acceder a tus fotos.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.5,
+      });
+
+      if (!result.canceled && result.assets && result.assets[0].uri) {
+        const newAvatarUrl = result.assets[0].uri;
+        const updatedProfile = { ...userProfile, avatarUrl: newAvatarUrl };
+        await AsyncStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(updatedProfile));
+        setUserProfile(updatedProfile);
+      }
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'No se pudo cargar la imagen.');
+    }
+  };
+
+  const handleLogoutConfirm = async () => {
+    setLoggingOut(true);
+    try {
+      // Realizar el cierre de sesión real a través de AuthContext
+      await signOut();
+      setShowLogoutConfirm(false);
+    } catch (e) {
+      console.error('Error al cerrar sesión:', e);
+      Alert.alert('Error', 'No se pudo cerrar sesión. Intentá de nuevo.');
+    } finally {
+      setLoggingOut(false);
+      setShowLogoutConfirm(false);
+    }
+  };
+
+
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+
+  /** Returns icon and color config based on trade type */
+  const getTradeVisuals = (type: TradeRecord['type']) => {
+    switch (type) {
+      case 'completed':
+        return {
+          icon: 'swap-horizontal' as const,
+          iconBg: theme.secondaryContainer,
+          iconColor: theme.onSecondaryContainer,
+          statusBg: theme.secondaryContainer,
+          statusColor: theme.secondary,
+        };
+      case 'pending':
+        return {
+          icon: 'time-outline' as const,
+          iconBg: theme.surfaceContainerHighest,
+          iconColor: theme.onSurfaceVariant,
+          statusBg: theme.surfaceContainerHighest,
+          statusColor: theme.onSurfaceVariant,
+        };
+      case 'cancelled':
+        return {
+          icon: 'close-circle-outline' as const,
+          iconBg: theme.errorContainer,
+          iconColor: theme.onErrorContainer,
+          statusBg: theme.errorContainer,
+          statusColor: theme.onErrorContainer,
+        };
+    }
+  };
+
+  // ─── Render ──────────────────────────────────────────────────────────────
+
   return (
-    <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.container}>
-      <ThemedView style={styles.card}>
-        <ThemedText type="headlineMd" style={styles.title}>
-          👤 Mi Perfil
-        </ThemedText>
-        <ThemedText type="bodyMd" style={styles.description}>
-          Acá podés configurar tus datos de usuario, revisar tu reputación como coleccionista y ver el historial de tus intercambios realizados.
-        </ThemedText>
-      </ThemedView>
-    </ScrollView>
+    <ThemedView style={styles.root}>
+      <AppHeader pendingNotificationsCount={pendingMatches} />
+
+      <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ── Profile Header ─────────────────────────────────────── */}
+        <View style={styles.profileHeader}>
+          {/* Avatar */}
+          <Pressable
+            onPress={handleAvatarPress}
+            style={({ pressed }) => [pressed && styles.pressed]}
+          >
+            <View style={[styles.avatarContainer, { backgroundColor: theme.surfaceContainerHigh, overflow: 'hidden' }]}>
+              {userProfile.avatarUrl ? (
+                <Image source={{ uri: userProfile.avatarUrl }} style={{ width: '100%', height: '100%' }} />
+              ) : (
+                <Ionicons name="person" size={44} color={theme.onSurfaceVariant} />
+              )}
+            </View>
+          </Pressable>
+
+          {/* Name */}
+          <ThemedText type="headlineMd" style={styles.userName}>
+            {userProfile.name}
+          </ThemedText>
+
+          {/* Email */}
+          <View style={styles.infoRow}>
+            <Ionicons name="mail-outline" size={14} color={theme.onSurfaceVariant} style={styles.infoIcon} />
+            <ThemedText type="bodyMd" style={{ color: theme.onSurfaceVariant }}>
+              {userProfile.email}
+            </ThemedText>
+          </View>
+
+          {/* Location / Barrio */}
+          <View style={styles.infoRow}>
+            <Ionicons name="location-sharp" size={14} color={theme.onSurfaceVariant} style={styles.infoIcon} />
+            <ThemedText type="bodyMd" style={{ color: theme.onSurfaceVariant }}>
+              {userProfile.location}
+            </ThemedText>
+          </View>
+
+          {/* Reputation Stars */}
+          <View
+            style={styles.ratingContainer}
+            accessibilityLabel={`Reputación: ${userProfile.rating} de 5 estrellas`}
+          >
+            {[1, 2, 3, 4, 5].map((starValue) => (
+              <Ionicons
+                key={starValue}
+                name={starValue <= userProfile.rating ? 'star' : 'star-outline'}
+                size={22}
+                color="#FF9500"
+                style={styles.starIcon}
+              />
+            ))}
+          </View>
+
+          {/* Trades count */}
+          <ThemedText type="bodyMd" style={{ color: theme.onSurfaceVariant, fontWeight: '500' }}>
+            {userProfile.totalTrades} intercambios exitosos
+          </ThemedText>
+        </View>
+
+        {/* ── Actions Row ─────────────────────────────────────────── */}
+        <View style={styles.actionsContainer}>
+          <Button
+            title="Editar Perfil"
+            onPress={handleEditProfilePress}
+            variant="primary"
+            style={styles.actionButton}
+          />
+          <Button
+            title="Compartir"
+            onPress={handleShareProfile}
+            variant="secondary"
+            style={styles.actionButton}
+          />
+        </View>
+
+        {/* ── Recent Trades Section ───────────────────────────────── */}
+        <View style={styles.tradesSection}>
+          <ThemedText type="headlineSm" style={styles.sectionTitle}>
+            Últimos intercambios
+          </ThemedText>
+
+          <View
+            style={[
+              styles.tradesCard,
+              {
+                backgroundColor: theme.surfaceContainerLowest,
+                borderColor: theme.outlineVariant + '44',
+              },
+            ]}
+          >
+            {recentTrades.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <ThemedText type="bodyMd" style={{ color: theme.onSurfaceVariant, textAlign: 'center', paddingVertical: Spacing.three }}>
+                  Sin intercambios recientes
+                </ThemedText>
+              </View>
+            ) : (
+              recentTrades.slice(0, 3).map((trade, index) => {
+                const visuals = getTradeVisuals(trade.type);
+
+                return (
+                  <View
+                    key={trade.id}
+                    style={[
+                      styles.tradeItem,
+                      { borderColor: theme.outlineVariant + '22' },
+                      index === Math.min(recentTrades.length, 3) - 1 && styles.lastTradeItem,
+                    ]}
+                  >
+                    {/* Status Icon */}
+                    <View style={[styles.tradeIconContainer, { backgroundColor: visuals.iconBg }]}>
+                      <Ionicons name={visuals.icon} size={20} color={visuals.iconColor} />
+                    </View>
+
+                    {/* Trade Details */}
+                    <View style={styles.tradeInfo}>
+                      <ThemedText type="bodyMd" style={styles.tradeDescription}>
+                        {'Entregaste '}
+                        <ThemedText type="bodyMd" style={styles.boldText}>
+                          {trade.offered}
+                        </ThemedText>
+                        {', recibiste '}
+                        <ThemedText type="bodyMd" style={styles.boldText}>
+                          {trade.received}
+                        </ThemedText>
+                      </ThemedText>
+                      {trade.partner && (
+                        <ThemedText type="labelSm" style={{ color: theme.onSurfaceVariant, marginTop: 1 }}>
+                          Con {trade.partner}
+                        </ThemedText>
+                      )}
+                      <ThemedText type="labelSm" style={{ color: theme.onSurfaceVariant, marginTop: 1 }}>
+                        {trade.date}
+                      </ThemedText>
+                    </View>
+
+                    {/* Status Badge */}
+                    <View style={[styles.statusBadge, { backgroundColor: visuals.statusBg }]}>
+                      <ThemedText style={[styles.statusBadgeText, { color: visuals.statusColor }]} type="labelSm">
+                        {trade.status}
+                      </ThemedText>
+                    </View>
+                  </View>
+                );
+              })
+            )}
+          </View>
+
+          {/* Full History link */}
+          <Pressable
+            onPress={handleFullHistory}
+            style={({ pressed }) => [styles.historyButton, pressed && styles.pressed]}
+          >
+            <ThemedText type="labelMd" style={{ color: theme.primary, fontWeight: '700' }}>
+              Ver historial completo
+            </ThemedText>
+            <Ionicons name="chevron-forward" size={14} color={theme.primary} style={styles.chevron} />
+          </Pressable>
+        </View>
+
+        {/* ── Logout Button ───────────────────────────────────────── */}
+        <View style={styles.logoutSection}>
+          <Pressable
+            onPress={() => setShowLogoutConfirm(true)}
+            style={({ pressed }) => [
+              styles.logoutButton,
+              { backgroundColor: theme.errorContainer },
+              pressed && styles.pressed,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Cerrar sesión"
+          >
+            <Ionicons name="log-out-outline" size={20} color={theme.onErrorContainer} style={styles.logoutIcon} />
+            <Text style={[styles.logoutText, { color: theme.onErrorContainer }]}>
+              Cerrar sesión
+            </Text>
+          </Pressable>
+        </View>
+      </ScrollView>
+
+      {/* ── Edit Profile Modal ─────────────────────────────────────── */}
+      <Modal
+        visible={isEditModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setIsEditModalVisible(false)}
+      >
+        <ThemedView style={styles.modalRoot}>
+          {/* Modal Header */}
+          <View style={[styles.modalHeader, { borderColor: theme.outlineVariant + '33' }]}>
+            <Pressable
+              onPress={() => setIsEditModalVisible(false)}
+              style={({ pressed }) => [styles.modalHeaderButton, pressed && styles.pressed]}
+            >
+              <ThemedText type="bodyLg" style={{ color: theme.primary, fontWeight: '600' }}>
+                Cancelar
+              </ThemedText>
+            </Pressable>
+            <ThemedText type="headlineSm" style={styles.modalTitle}>
+              Editar Perfil
+            </ThemedText>
+            <Pressable
+              onPress={handleSaveProfile}
+              disabled={saving}
+              style={({ pressed }) => [styles.modalHeaderButton, pressed && styles.pressed]}
+            >
+              {saving ? (
+                <ActivityIndicator size="small" color={theme.primary} />
+              ) : (
+                <ThemedText type="bodyLg" style={{ color: theme.primary, fontWeight: '700' }}>
+                  Guardar
+                </ThemedText>
+              )}
+            </Pressable>
+          </View>
+
+          <ScrollView
+            contentContainerStyle={styles.modalContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Avatar picker */}
+            <View style={styles.avatarSection}>
+              <Pressable
+                onPress={handleAvatarPress}
+                style={({ pressed }) => [styles.avatarWrapper, pressed && styles.pressed]}
+              >
+                <View style={[styles.avatarContainerLarge, { backgroundColor: theme.surfaceContainerHigh, overflow: 'hidden' }]}>
+                  {userProfile.avatarUrl ? (
+                    <Image source={{ uri: userProfile.avatarUrl }} style={{ width: '100%', height: '100%' }} />
+                  ) : (
+                    <Ionicons name="person" size={54} color={theme.onSurfaceVariant} />
+                  )}
+                </View>
+                <View style={[styles.editBadge, { backgroundColor: theme.primary }]}>
+                  <Ionicons name="camera" size={16} color={theme.onPrimary} />
+                </View>
+              </Pressable>
+              <ThemedText
+                type="labelSm"
+                style={{ color: theme.primary, marginTop: Spacing.two, fontWeight: '700' }}
+              >
+                Cambiar foto
+              </ThemedText>
+            </View>
+
+            {/* Inputs Form */}
+            <View style={styles.form}>
+              {/* Name */}
+              <View style={styles.inputGroup}>
+                <ThemedText type="labelMd" style={[styles.label, { color: theme.onSurfaceVariant }]}>
+                  Nombre
+                </ThemedText>
+                <TextInput
+                  value={editName}
+                  onChangeText={setEditName}
+                  onFocus={() => setIsNameFocused(true)}
+                  onBlur={() => setIsNameFocused(false)}
+                  placeholder="Tu nombre"
+                  placeholderTextColor={theme.onSurfaceVariant + '88'}
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: theme.surfaceContainerHigh,
+                      color: theme.onSurface,
+                      borderColor: isNameFocused ? theme.primary : 'transparent',
+                      borderWidth: 2,
+                    },
+                  ]}
+                  maxLength={30}
+                />
+              </View>
+
+              {/* Location */}
+              <View style={styles.inputGroup}>
+                <ThemedText type="labelMd" style={[styles.label, { color: theme.onSurfaceVariant }]}>
+                  Ubicación
+                </ThemedText>
+                <View style={styles.inputWrapper}>
+                  <TextInput
+                    value={editLocation}
+                    onChangeText={handleLocationChange}
+                    onFocus={() => setIsLocationFocused(true)}
+                    onBlur={() => setIsLocationFocused(false)}
+                    placeholder="Ingresá tu barrio o ciudad"
+                    placeholderTextColor={theme.onSurfaceVariant + '88'}
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: theme.surfaceContainerHigh,
+                        color: theme.onSurface,
+                        borderColor: isLocationFocused ? theme.primary : 'transparent',
+                        borderWidth: 2,
+                        paddingRight: 40,
+                      },
+                    ]}
+                    maxLength={40}
+                  />
+                  {searchingLocation && (
+                    <ActivityIndicator
+                      size="small"
+                      color={theme.primary}
+                      style={styles.inputIconRight}
+                    />
+                  )}
+                  {!searchingLocation && isValidLocation(editLocation) && (
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={20}
+                      color={theme.secondary}
+                      style={styles.inputIconRight}
+                    />
+                  )}
+                </View>
+                {/* Suggestions List */}
+                {locationSuggestions.length > 0 && (
+                  <View style={styles.suggestionsContainer}>
+                    {locationSuggestions.map((suggestion) => (
+                      <TouchableOpacity
+                        key={suggestion}
+                        style={[styles.suggestionChip, { backgroundColor: theme.surfaceContainerHighest, borderColor: theme.outlineVariant }]}
+                        onPress={() => handleSelectSuggestion(suggestion)}
+                      >
+                        <ThemedText type="bodyMd" style={{ color: theme.onSurface }}>
+                          {suggestion}
+                        </ThemedText>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+            </View>
+          </ScrollView>
+        </ThemedView>
+      </Modal>
+
+      {/* ── Full History Modal ─────────────────────────────────────── */}
+      <Modal
+        visible={isHistoryModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setIsHistoryModalVisible(false)}
+      >
+        <ThemedView style={styles.modalRoot}>
+          {/* Modal Header */}
+          <View style={[styles.modalHeader, { borderColor: theme.outlineVariant + '33' }]}>
+            <Pressable
+              onPress={() => setIsHistoryModalVisible(false)}
+              style={({ pressed }) => [styles.modalHeaderButton, pressed && styles.pressed]}
+            >
+              <ThemedText type="bodyLg" style={{ color: theme.primary, fontWeight: '600' }}>
+                Cerrar
+              </ThemedText>
+            </Pressable>
+            <ThemedText type="headlineSm" style={styles.modalTitle}>
+              Historial Completo
+            </ThemedText>
+            <View style={{ minWidth: 80 }} />
+          </View>
+
+          <ScrollView
+            contentContainerStyle={styles.modalContent}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.tradesSection}>
+              {recentTrades.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <Ionicons name="swap-horizontal-outline" size={48} color={theme.onSurfaceVariant + '44'} />
+                  <ThemedText type="bodyMd" style={{ color: theme.onSurfaceVariant, marginTop: 12, textAlign: 'center' }}>
+                    Todavía no realizaste ningún intercambio.
+                  </ThemedText>
+                </View>
+              ) : (
+                <View
+                  style={[
+                    styles.tradesCard,
+                    {
+                      backgroundColor: theme.surfaceContainerLowest,
+                      borderColor: theme.outlineVariant + '44',
+                    },
+                  ]}
+                >
+                  {recentTrades.map((trade, index) => {
+                    const visuals = getTradeVisuals(trade.type);
+
+                    return (
+                      <View
+                        key={trade.id}
+                        style={[
+                          styles.tradeItem,
+                          { borderColor: theme.outlineVariant + '22' },
+                          index === recentTrades.length - 1 && styles.lastTradeItem,
+                        ]}
+                      >
+                        {/* Status Icon */}
+                        <View style={[styles.tradeIconContainer, { backgroundColor: visuals.iconBg }]}>
+                          <Ionicons name={visuals.icon} size={20} color={visuals.iconColor} />
+                        </View>
+
+                        {/* Trade Details */}
+                        <View style={styles.tradeInfo}>
+                          <ThemedText type="bodyMd" style={styles.tradeDescription}>
+                            {'Entregaste '}
+                            <ThemedText type="bodyMd" style={styles.boldText}>
+                              {trade.offered}
+                            </ThemedText>
+                            {', recibiste '}
+                            <ThemedText type="bodyMd" style={styles.boldText}>
+                              {trade.received}
+                            </ThemedText>
+                          </ThemedText>
+                          {trade.partner && (
+                            <ThemedText type="labelSm" style={{ color: theme.onSurfaceVariant, marginTop: 1 }}>
+                              Con {trade.partner}
+                            </ThemedText>
+                          )}
+                          <ThemedText type="labelSm" style={{ color: theme.onSurfaceVariant, marginTop: 1 }}>
+                            {trade.date}
+                          </ThemedText>
+                        </View>
+
+                        {/* Status Badge */}
+                        <View style={[styles.statusBadge, { backgroundColor: visuals.statusBg }]}>
+                          <ThemedText style={[styles.statusBadgeText, { color: visuals.statusColor }]} type="labelSm">
+                            {trade.status}
+                          </ThemedText>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
+          </ScrollView>
+        </ThemedView>
+      </Modal>
+
+      {/* ── Logout Confirmation Modal ─────────────────────────────── */}
+      {/* Rendered as a Modal to sit above the tab bar and navigation */}
+      <Modal
+        visible={showLogoutConfirm}
+        animationType="fade"
+        transparent
+        statusBarTranslucent
+        onRequestClose={() => !loggingOut && setShowLogoutConfirm(false)}
+      >
+        <View style={styles.confirmOverlay}>
+          <View style={[styles.confirmCard, { backgroundColor: theme.surface }]}>
+            {/* Warning Icon */}
+            <View style={[styles.confirmIconBg, { backgroundColor: theme.errorContainer }]}>
+              <Ionicons name="log-out-outline" size={28} color={theme.onErrorContainer} />
+            </View>
+
+            {/* Content */}
+            <View style={styles.confirmContent}>
+              <Text style={[styles.confirmTitle, { color: theme.onSurface }]}>
+                ¿Cerrás sesión?
+              </Text>
+              <Text style={[styles.confirmDescription, { color: theme.onSurfaceVariant }]}>
+                Tu progreso está guardado. Podés volver a ingresar cuando quieras.
+              </Text>
+            </View>
+
+            {/* Actions */}
+            <View style={styles.confirmActionsContainer}>
+              <TouchableOpacity
+                style={[styles.confirmBtnConfirm, { backgroundColor: theme.error }]}
+                onPress={handleLogoutConfirm}
+                activeOpacity={0.8}
+                disabled={loggingOut}
+              >
+                {loggingOut ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.confirmBtnConfirmText}>Sí, cerrar sesión</Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.confirmBtnCancel, { backgroundColor: theme.surfaceContainerHigh }]}
+                onPress={() => setShowLogoutConfirm(false)}
+                activeOpacity={0.8}
+                disabled={loggingOut}
+              >
+                <Text style={[styles.confirmBtnCancelText, { color: theme.onSurfaceVariant }]}>
+                  Cancelar
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </ThemedView>
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
   container: {
-    flexGrow: 1,
     padding: Spacing.three,
     paddingBottom: 110, // room for bottom tab bar
-    justifyContent: 'center',
-    alignItems: 'center',
     maxWidth: 500,
     width: '100%',
     alignSelf: 'center',
   },
-  card: {
+
+  // ── Profile Header ──────────────────────────────────────────────────────
+  profileHeader: {
+    alignItems: 'center',
+    marginTop: Spacing.three,
+    marginBottom: Spacing.four,
+  },
+  avatarContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: Spacing.two,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.05)',
+    elevation: 2,
+  },
+  userName: {
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  infoIcon: {
+    marginRight: 5,
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: Spacing.two,
+    marginBottom: Spacing.one,
+  },
+  starIcon: {
+    marginHorizontal: 1,
+  },
+
+  // ── Actions ─────────────────────────────────────────────────────────────
+  actionsContainer: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+    justifyContent: 'center',
+    marginBottom: Spacing.five,
+  },
+  actionButton: {
+    flex: 1,
+    maxWidth: 160,
+  },
+
+  // ── Trades Section ───────────────────────────────────────────────────────
+  tradesSection: {
+    width: '100%',
+  },
+  sectionTitle: {
+    fontWeight: '700',
+    marginBottom: Spacing.three,
+  },
+  tradesCard: {
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#c1c6d733',
-    padding: Spacing.four,
-    width: '100%',
-    gap: Spacing.two,
+    overflow: 'hidden',
+    borderCurve: 'continuous',
+    boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.03)',
+    elevation: 1,
+  },
+  tradeItem: {
+    flexDirection: 'row',
     alignItems: 'center',
-    boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.05)',
+    padding: Spacing.three,
+    borderBottomWidth: 1,
   },
-  title: {
-    textAlign: 'center',
-    fontWeight: 'bold',
+  lastTradeItem: {
+    borderBottomWidth: 0,
   },
-  description: {
+  tradeIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: Spacing.three,
+  },
+  tradeInfo: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  tradeDescription: {
+    lineHeight: 18,
+  },
+  boldText: {
+    fontWeight: '700',
+  },
+  statusBadge: {
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 4,
+    borderRadius: 999,
+    alignSelf: 'flex-start',
+    marginLeft: Spacing.one,
+  },
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  historyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: Spacing.three,
+    paddingVertical: Spacing.two,
+  },
+  chevron: {
+    marginLeft: 4,
+  },
+
+  // ── Logout ───────────────────────────────────────────────────────────────
+  logoutSection: {
+    marginTop: Spacing.five,
+    marginBottom: Spacing.three,
+    width: '100%',
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 50,
+    borderRadius: 12,
+    borderCurve: 'continuous',
+    gap: Spacing.two,
+  },
+  logoutIcon: {
+    // gap handles spacing
+  },
+  logoutText: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+
+  // ── General ──────────────────────────────────────────────────────────────
+  pressed: {
+    opacity: 0.7,
+  },
+
+  // ── Edit Modal ───────────────────────────────────────────────────────────
+  modalRoot: {
+    flex: 1,
+  },
+  modalHeader: {
+    height: 56,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.three,
+    borderBottomWidth: 1,
+  },
+  modalHeaderButton: {
+    paddingVertical: Spacing.one,
+    paddingHorizontal: Spacing.two,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontWeight: '700',
+  },
+  modalContent: {
+    padding: Spacing.three,
+    paddingBottom: 40,
+    maxWidth: 500,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  avatarSection: {
+    alignItems: 'center',
+    marginTop: Spacing.three,
+    marginBottom: Spacing.four,
+  },
+  avatarWrapper: {
+    position: 'relative',
+  },
+  avatarContainerLarge: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    boxShadow: '0px 4px 10px rgba(0, 0, 0, 0.08)',
+    elevation: 3,
+  },
+  editBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#ffffff',
+    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.15)',
+    elevation: 2,
+  },
+  form: {
+    gap: Spacing.four,
+    marginBottom: Spacing.five,
+  },
+  inputGroup: {
+    gap: Spacing.one,
+  },
+  label: {
+    fontWeight: '600',
+    paddingLeft: Spacing.one,
+  },
+  input: {
+    height: 48,
+    borderRadius: 12,
+    paddingHorizontal: Spacing.three,
+    fontSize: 15,
+    borderCurve: 'continuous',
+  },
+
+  // ── Logout Confirmation Modal (same design as matches.tsx confirmOverlay) ─
+  confirmOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 50,
+    padding: 16,
+  },
+  confirmCard: {
+    width: '100%',
+    maxWidth: 330,
+    borderRadius: 24,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  confirmIconBg: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  confirmContent: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  confirmTitle: {
+    fontSize: 17,
+    fontWeight: '600',
     textAlign: 'center',
-    opacity: 0.8,
-    lineHeight: 22,
+    marginBottom: 8,
+  },
+  confirmDescription: {
+    fontSize: 15,
+    fontWeight: '400',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  confirmActionsContainer: {
+    width: '100%',
+    gap: 12,
+  },
+  confirmBtnConfirm: {
+    width: '100%',
+    height: 50,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  confirmBtnConfirmText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  confirmBtnCancel: {
+    width: '100%',
+    height: 50,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  confirmBtnCancelText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  inputWrapper: {
+    position: 'relative',
+    width: '100%',
+  },
+  inputIconRight: {
+    position: 'absolute',
+    right: 12,
+    top: 14,
+  },
+  suggestionsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+    paddingHorizontal: 4,
+  },
+  suggestionChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
   },
 });

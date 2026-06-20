@@ -1,237 +1,280 @@
 # FiguMatch – Especificación del MVP (TP4)
 
 ## Problema
-Coleccionistas del Mundial 2026 necesitan intercambiar figuritas de forma segura, sin encuentros con extraños ni coordinación caótica.
+Coleccionistas del Mundial 2026 necesitan intercambiar figuritas de forma segura, sin encuentros con extraños ni coordinación caótica. Las alternativas actuales (grupos de Facebook, WhatsApp, MercadoLibre) generan desconfianza, pérdida de tiempo y especulación económica.
 
 ## Propuesta de valor
 Intercambiá figuritas sin miedo: llevá tus duplicadas a un kiosco adherido, retirá las que te faltan. Seguridad, cercanía y garantía digital.
 
 ## Alcance del MVP
-Camino crítico: **Registro/Login** → Agregar figuritas (con datos de api-football) → Buscar coincidencias → Aceptar canje → Código de intercambio → Ver kiosco en mapa.
+Camino crítico: **Onboarding (único)** → **Login / Registro** → Agregar figuritas (con API Football para nombre y foto) → Buscar coincidencias → Aceptar canje → Código de intercambio → Ver kiosco en mapa.
 
 ### Funcionalidades incluidas
-- **Autenticación con Supabase Auth:**
-  - Registro con email/contraseña (nombre, email, contraseña, repetir contraseña).
-  - Login con email/contraseña.
-  - Login con Google OAuth.
-  - Recuperación de contraseña (envío de enlace mágico por email).
-  - Persistencia de sesión (almacenada en AsyncStorage mediante cliente Supabase).
-  - Cierre de sesión desde la pantalla de Perfil.
-- **Base de datos Supabase:** tablas `profiles`, `figuritas`, `matches`, `kioscos`, `intercambios`.
-- **Trigger SQL** para crear automáticamente el perfil del usuario al registrarse (evita lógica extra en la app).
-- **Onboarding** de 3 slides (primer inicio, previo al login).
-- **CRUD de figuritas** (número, tipo: repetida/faltante, nombre opcional) sincronizado con Supabase.
-- **API externa api-football.com:** búsqueda del nombre del jugador al ingresar el número de figurita (con mapeo local previo). Manejo de estados: carga, éxito, error, sin resultados.
-- **Match simulado:** cruza figuritas del usuario con otros usuarios reales en la BD. Si no hay suficientes coincidencias, se complementa con datos dummy precargados.
-- **Detalle de match y aceptación** con generación de código único (UUID), asignación de kiosco aleatorio y registro en tabla `intercambios`.
-- **Pantalla de código** con QR e instrucciones.
-- **Mapa de kioscos** con marcadores estáticos obtenidos de la tabla `kioscos`.
-- **Perfil** con datos reales (nombre, barrio, reputación calculada de intercambios) y botón de logout.
-- **Manejo de estados de interfaz:** carga, vacío, error, sin conexión, sesión expirada.
+
+#### Autenticación con Supabase Auth
+- Registro con email/contraseña (nombre, email, contraseña, repetir contraseña).
+- Login con email/contraseña.
+- Login con Google OAuth.
+- Recuperación de contraseña (envío de enlace mágico + pantalla para cambiar la contraseña con posibilidad de pegar token manualmente).
+- Persistencia de sesión (AsyncStorage mediante cliente Supabase).
+- Cierre de sesión (limpia flag de onboarding y datos locales).
+
+#### Base de datos Supabase
+- Tablas: `profiles`, `figuritas`, `matches`, `kioscos`, `intercambios`.
+- Trigger para creación automática de perfil al registrarse.
+- Función especial para obtener figuritas de otros usuarios sin exponer datos sensibles.
+- Políticas de seguridad: cada usuario solo ve sus propias figuritas; los matches se generan con datos anónimos.
+
+#### Supabase Storage
+- **Bucket `jugadores`:** almacena las fotos de los jugadores obtenidas de la API Football.
+  - Lectura pública, escritura solo autenticada.
+  - Nombre de archivo: `{numero}-{nombre_sanitizado}.png`.
+  - Si la imagen ya existe, no se reemplaza.
+- **Imágenes de selecciones:** NO se almacenan en Supabase Storage. Se usan assets locales (carpeta `assets/banderas/`).
+
+#### Onboarding
+- 3 slides explicativos, mostrado **una única vez** al inicio (antes del Login).
+- Controlado por un flag en AsyncStorage.
+- Al hacer logout, se limpia el flag para que el próximo usuario lo vea.
+
+#### CRUD de figuritas
+- Campo `nombre_jugador` (obligatorio, ingresado por el usuario y buscado en la API).
+- Campo `tipo` (obligatorio: `'repetida'` | `'faltante'`).
+- Campo `numero` (calculado determinísticamente de 1 a 678 en base al hash del nombre del jugador para mantener compatibilidad relacional).
+- Campo `imagen_url` (opcional, devuelto por la API y descargado/subido a Supabase Storage al guardar la figurita).
+- Campo `seleccion` (nacionalidad del jugador, autocompletada por la API o ingresada manualmente).
+- Sincronizado con Supabase.
+
+#### API externa api-football.com
+- **Uso exclusivo para:**
+  1. Obtener la **nacionalidad** del jugador para autocompletar la selección.
+  2. Obtener la **foto** oficial del jugador y subirla a Supabase Storage al guardar la figurita.
+- **Endpoint:** `GET https://v3.football.api-sports.io/players?season=2026&league=1&search={nombre}`
+- **Estados:** carga (spinner), éxito (autocompletado de selección + preview de imagen), vacío ("Jugador no encontrado. Podés guardarlo igual"), error (mensaje descriptivo + botón "Reintentar").
+- **Debounce:** 800ms al escribir el nombre del jugador para mitigar consumo de consultas.
+- **API Key:** en `.env` (`EXPO_PUBLIC_API_FOOTBALL_KEY`), no commiteada.
+
+#### Determinación de Número de Figurita
+- En lugar de forzar al usuario a ingresar manualmente un número de figurita o depender de un mapeo estático de 30 jugadores, el sistema genera de forma determinística un número entero entre 1 y 678 en base al hash del nombre del jugador. Esto preserva de manera transparente la compatibilidad con el algoritmo relacional de matchmaking de Supabase.
+
+#### Matches (coincidencias)
+- Generados dinámicamente a partir de las figuritas del usuario.
+- Cruce: figuritas `repetida` del usuario ↔ figuritas `faltante` de otros usuarios.
+- Filtro en pantalla diferenciando correctamente las figuritas "ofrecidas" (las que otros usuarios ofrecen y me sirven) de las "buscadas" (las que yo tengo repetidas y le sirven a otros).
+- Si no hay suficientes usuarios reales, se complementa con datos dummy **vinculados a las figuritas del usuario** (no matches genéricos).
+
+#### Flujo de intercambio
+- Detalle de match con modal de confirmación.
+- Generación de código único (formato `FIG-XXXX-KX`).
+- Registro en tabla `intercambios` con kiosco asignado aleatoriamente de los activos.
+- Pantalla de código con QR, instrucciones y botón para ver en mapa.
+
+#### Mapa de kioscos
+- Consulta dinámicamente de Supabase los kioscos activos (actualmente 6 marcadores).
+- Si se recibe `kioscoId`, se destaca en verde.
+- Tarjeta inferior con nombre, dirección y horario al tocar un marcador.
+- Botón "Cómo llegar" integrado con la aplicación nativa de mapas de Google (mediante redirección URL).
+
+#### Perfil
+- Datos del usuario desde la tabla `profiles` de Supabase.
+- Permite editar el nombre y el barrio (ubicación) del usuario con una lista de sugerencias autocompletadas para barrios válidos de Catamarca.
+- Reputación simulada en base a la cantidad de intercambios reales completados.
+- Historial completo de intercambios en modal.
+- Botón "Cerrar sesión" que limpia AsyncStorage y redirige a Login.
+
+#### Manejo de estados de interfaz
+- **Carga:** `StatusScreen` con spinner.
+- **Vacío:** `StatusScreen` con ilustración y CTA.
+- **Error:** `StatusScreen` con mensaje y botón "Reintentar".
+- **Éxito:** autocompletado, check verde, navegación.
 
 ### Funcionalidades excluidas (futuras)
-- Escaneo por IA, cadenas de trueque de más de dos personas, chat, notificaciones push, verificación de email en registro, roles de kiosquero.
+- Chat interno, cadenas de trueque de más de dos personas, notificaciones push, verificación de email, rol de kiosquero, modo feria, donaciones, dorsales.
 
 ## Stack tecnológico
-- **Framework:** React Native con Expo (managed workflow)
-- **Lenguaje:** TypeScript
-- **Backend/BD:** Supabase (PostgreSQL + Auth + API)
-- **Navegación:** React Navigation (Auth Stack + Bottom Tabs + Stacks internos)
-- **Estado:** React Context + useReducer (AuthContext, FiguritasContext)
-- **Persistencia local:** AsyncStorage (para sesión de Supabase y cachés)
+- **Framework:** React Native con Expo (managed workflow, SDK 52+)
+- **Lenguaje:** TypeScript (strict mode)
+- **Backend/BD:** Supabase (PostgreSQL + Auth + Storage)
+- **Herramientas:** MCP de Supabase para gestión de base de datos, autenticación y storage.
+- **Navegación:** React Navigation v6 (RootStack modal + AuthStack + Bottom Tabs)
+- **Estado global:** AuthContext (React Context + useReducer)
+- **Estado local:** useState en pantallas
+- **Persistencia:** AsyncStorage (sesión, flag de onboarding)
 - **Mapas:** react-native-maps
-- **API externa:** api-football.com (endpoint: `/players?season=2026&league=1&search=NAME`)
-- **Estilos:** StyleSheet nativo + tema constante
+- **QR:** react-native-qrcode-svg
+- **API externa:** api-football.com
+- **Estilos:** StyleSheet nativo + tema centralizado
 
 ## Estructura del proyecto
 /FiguMatch
-/src
-/components → Button, Input, CardFigurita, CardMatch, StatusScreen, etc.
-/screens → Login, Register, ForgotPassword, Home, AddFigurita, Matches, MatchDetail, Code, Map, Profile, Onboarding
-/navigation → AuthStack, MainTabs, RootNavigator
-/context → AuthContext, FiguritasContext
-/services → api.ts (api-football), supabase.ts (cliente), matches.ts (cruce y dummy)
-/constants → theme.ts, dummyData.ts, playerMapping.ts
-/utils → helpers (validación, generación de código)
-App.tsx → Entry point con AuthProvider
+├── App.tsx
+├── assets/
+│ └── banderas/ (32 íconos de selecciones)
+├── src/
+│ ├── components/ (Button, Input, CardFigurita, CardMatch, StatusScreen)
+│ ├── screens/ (Login, Register, ForgotPassword, UpdatePassword,
+│ │ Home, AddFigurita, Matches, MatchDetail, Code, Map, Profile, Onboarding)
+│ ├── navigation/ (RootNavigator, AuthStack, MainTabs)
+│ ├── context/ (AuthContext)
+│ ├── services/ (supabase, api, figuritasService, matchesService, tradeService, kioscosService, storageService)
+│ ├── constants/ (theme, playerMapping, dummyMatches)
+│ └── utils/ (helpers)
 
 ## Flujo de autenticación
-1. **Inicio:** Splash screen mientras se verifica sesión con `supabase.auth.getSession()`.
-   - Si hay sesión → `MainTabs` (Home).
-   - Si no hay sesión → ¿Primer inicio? (`AsyncStorage`) → `Onboarding` (3 slides) → `Login`. Caso contrario, directo a `Login`.
-2. **Login:**
-   - Email/contraseña → `signInWithPassword`. Si error "Invalid login credentials" → mostrar "Email o contraseña incorrectos." y sugerir registro. Si error de red, mensaje de reconexión.
-   - "Continuar con Google" → `signInWithOAuth({ provider: 'google' })`. Si es nuevo usuario, trigger SQL crea perfil automáticamente.
-   - Link "¿Olvidaste tu contraseña?" → `ForgotPassword`.
-   - Link "¿No tenés cuenta? Registrate" → `Register`.
-3. **Registro:**
-   - Validación local: nombre obligatorio, email válido, contraseña ≥6 caracteres, coincidencia de repetir contraseña.
-   - Llamada a `signUp` con `options.data.name`. Si éxito, trigger crea perfil; si `User already registered`, mostrar mensaje "Ya existe una cuenta con este email. ¿Querés iniciar sesión?" con enlace a Login (pre-rellenando email).
-   - También disponible "Continuar con Google" (mismo flujo que Login).
-4. **Recuperación de contraseña:**
-   - Ingreso de email → `resetPasswordForEmail`. Éxito: "Revisá tu correo electrónico." Error: mensaje genérico con opción de reintentar. Botón "Volver al inicio de sesión".
-5. **Logout:** En Perfil, botón "Cerrar sesión" → `signOut()`, limpiar AsyncStorage, redirigir a `Login`.
+1. **Inicio:** verificar si ya se vio el Onboarding. Si no → Onboarding (3 slides) → Login.
+2. **Login / Registro:** AuthContext maneja sesión con Supabase. Después del login, si el perfil no existe (por fallo del trigger), se crea manualmente.
+3. **Google OAuth:** si el usuario cancela, no se muestra error. Si el nombre viene vacío, se permite editarlo en Perfil.
+4. **Recuperación:** envío de enlace mágico. La pantalla de cambio de contraseña captura el token vía deep link o permite pegarlo manualmente.
+5. **Logout:** cierre de sesión, limpieza de AsyncStorage (incluyendo flag de onboarding), redirección a Login.
+
+## Flujo de navegación completo
+### Pantallas y transiciones
+| Pantalla | Navega a | Condiciones |
+|----------|----------|-------------|
+| OnboardingScreen | LoginScreen | Al finalizar slides |
+| LoginScreen | RegisterScreen, ForgotPasswordScreen, HomeScreen | Login exitoso |
+| RegisterScreen | LoginScreen, HomeScreen | Registro exitoso |
+| ForgotPasswordScreen | LoginScreen | Éxito o cancelar |
+| UpdatePasswordScreen | LoginScreen | Contraseña actualizada |
+| HomeScreen | AddFiguritaScreen, MatchesScreen | |
+| AddFiguritaScreen | HomeScreen | Al guardar o cancelar |
+| MatchesScreen | MatchDetailScreen | Al seleccionar match |
+| MatchDetailScreen | CodeScreen (modal) | Al aceptar intercambio |
+| CodeScreen | MapScreen, HomeScreen, MatchesScreen | Al cerrar modal |
+| MapScreen | - | |
+| ProfileScreen | LoginScreen | Al cerrar sesión |
+
+### CodeScreen como modal raíz
+- No pertenece a ningún tab.
+- Se presenta desde `MatchDetailScreen`.
+- Al cerrarse, vuelve a `MatchesScreen` (nunca a `MatchDetailScreen`).
+- Tiene botones para navegar a `MapScreen`, `HomeScreen` o `MatchesScreen`.
 
 ## Base de datos Supabase
-Tablas:
+### Tablas
 - `profiles` (id, email, nombre, barrio, reputacion)
-- `figuritas` (id, user_id FK, numero, tipo, nombre_jugador)
-- `matches` (id, user1_id FK, user2_id FK, fig1_id FK, fig2_id FK, estado)
+- `figuritas` (id, user_id, numero, tipo, nombre_jugador, imagen_url, seleccion, created_at)
+- `matches` (id, user1_id, user2_id, fig1_id, fig2_id, estado)
 - `kioscos` (id, nombre, direccion, lat, lng, horario)
-- `intercambios` (id, match_id FK, codigo, kiosco_id FK, estado, fecha_entrega, fecha_retiro)
+- `intercambios` (id, match_id, codigo, kiosco_id, estado, fecha_entrega, fecha_retiro)
 
-Trigger:
-```sql
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
-BEGIN
-  INSERT INTO public.profiles (id, email, nombre)
-  VALUES (NEW.id, NEW.email, COALESCE(NEW.raw_user_meta_data ->> 'name', 'Usuario'));
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+### Políticas de seguridad
+- `profiles`: lectura pública, modificación solo del dueño.
+- `figuritas`: solo el dueño puede ver y modificar.
+- `matches`: solo los participantes pueden ver.
+- `kioscos`: lectura pública.
+- `intercambios`: solo los participantes pueden ver.
 
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+## Supabase Storage
+### Bucket `jugadores`
+- **Acceso:** lectura pública, escritura autenticada.
+- **Nombre de archivo:** `{numero}-{nombre_sanitizado}.png`.
+- **Flujo:** si la API devuelve `photo`, se descarga y se sube al bucket. Si ya existe, no se reemplaza.
 
-Políticas RLS: perfiles (SELECT público, INSERT/UPDATE dueño), figuritas solo dueño, matches visibles a participantes, kioscos lectura pública.
+## API Football
+### Endpoint
+GET https://v3.football.api-sports.io/players?season=2026&league=1&search={nombre}
+Headers: x-apisports-key: <API_KEY>
 
-API Football
-Justificación: API REST real de fútbol, plan gratuito 100 req/día, datos actualizados del Mundial 2026. Alternativas evaluadas: TheSportsDB (menos robusta), datos locales (no cumplen consigna).
+### Datos utilizados
+- `player.name` → nombre oficial del jugador.
+- `player.photo` → imagen del jugador (cacheada en Supabase Storage).
 
-Uso: Al ingresar número de figurita, se busca en mapeo local (playerMapping.ts) y luego en API. Estados: carga (spinner), éxito (autocompletado), error/fallo (mensaje con reintento, se permite guardar sin nombre).
+### Datos NO utilizados (provistos por mapeo local)
+- `player.statistics[0].team.name` (selección).
+- `player.statistics[0].games.number` (dorsal).
+- `player.statistics[0].team.logo` (logo de selección).
 
-Seguridad: clave en variable de entorno EXPO_PUBLIC_API_FOOTBALL_KEY.
+### Flujo en AddFiguritaScreen
+1. El usuario ingresa el nombre del jugador en el campo de texto. Debounce de 800ms.
+2. Se realiza una búsqueda automática en API Football llamando a `searchPlayer(nombre)`.
+3. Si la API devuelve datos exitosamente:
+   - Se autocompleta el campo de selección con la nacionalidad oficial obtenida.
+   - Se muestra un preview de la foto oficial del jugador devuelta por la API.
+   - Se muestra un check de éxito (verde) por 2 segundos.
+4. Si la API no encuentra al jugador, se muestra una advertencia descriptiva y se permite continuar con el ingreso manual del nombre y de la selección.
+5. Al guardar, si hay una foto externa, se descarga e inserta en el bucket de Supabase Storage.
+6. El número de figurita (1-678) se genera automáticamente mediante hashing del nombre del jugador para mantener compatibilidad con el sistema de matchmaking.
+7. Se permite guardar la figurita manualmente y sin imagen si la búsqueda en la API falla o se cancela.
 
-Cómo ejecutar
-Clonar repo, npm install
+## Gestión de errores y logging
+- **Errores de red:** se muestran mensajes descriptivos con botón de reintento.
+- **Errores de API:** se capturan y muestran mensajes específicos (jugador no encontrado, límite de consultas, timeout).
+- **Errores de Supabase:** se registran en consola (solo en desarrollo) y se notifica al usuario.
+- **Logging:** `console.error` en desarrollo. En producción se reemplazaría por un servicio externo.
 
-Crear proyecto en Supabase, ejecutar migraciones SQL
+## Seguridad
+- **Variables de entorno:** claves API y URL de Supabase en `.env`, no commiteado.
+- **RLS:** acceso a datos restringido por usuario autenticado.
+- **Almacenamiento de sesión:** AsyncStorage (en producción se usaría almacenamiento seguro).
+- **Comunicaciones:** HTTPS para todas las llamadas a API y Supabase.
 
-Configurar .env con:
+## Accesibilidad
+- Contraste mínimo 4.5:1 en textos principales.
+- Áreas táctiles mínimas de 48x48dp.
+- Textos descriptivos en imágenes (futuro).
+- Tamaños de fuente escalables.
 
-EXPO_PUBLIC_SUPABASE_URL
+## Internacionalización
+- Textos en español (es-AR) como idioma principal.
+- Preparado para futura internacionalización.
 
-EXPO_PUBLIC_SUPABASE_ANON_KEY
+## Métricas de éxito del MVP
+- **Registro:** al menos 10 usuarios registrados en la prueba.
+- **Retención:** al menos un 40% de usuarios que completan un intercambio solicitan un segundo.
+- **Matches:** al menos 5 matches generados entre usuarios reales durante la validación.
+- **Uso de API:** menos de 100 requests/día para no exceder el plan gratuito.
 
-EXPO_PUBLIC_API_FOOTBALL_KEY
+## Plan de pruebas
+### Pruebas manuales
+- Camino feliz: registro, login, agregar figurita, buscar matches, aceptar, ver código, mapa.
+- Estados alternativos: sin figuritas, sin matches, error de API, error de red, filtro sin resultados, logout/relogin.
 
-npx expo start y escanear QR con Expo Go
+### Criterios de aceptación por historia de usuario
+- US-01: El usuario puede agregar una figurita y verla en su lista.
+- US-02: El usuario ve coincidencias cuando hay figuritas compatibles.
+- US-03: El usuario acepta un intercambio y recibe un código único.
+- US-04: El usuario ve un mapa con kioscos marcados.
+- US-05: El usuario puede ver su perfil y cerrar sesión.
 
-Integrantes
-Tapia Lautaro (Tech Lead, revisor de PR)
+## Plan de despliegue
+- **Desarrollo:** Expo Go en dispositivos físicos y emuladores.
+- **Pruebas internas:** build de desarrollo con EAS Build.
+- **Producción (futuro):** publicación en App Store y Google Play mediante EAS Submit.
 
-Graciela (lógica compleja, auth, API, BD)
+## Datos reales vs simulados
+| Dato | Origen | Motivo |
+|------|--------|--------|
+| Autenticación, perfil, figuritas | Real (Supabase) | Validar persistencia y seguridad |
+| Nombre y foto del jugador | Real (api-football.com + Supabase Storage) | Cumplir consigna de API externa y demostrar Storage |
+| Selección y bandera | Local (`playerMapping.ts` + `assets/banderas/`) | Datos estáticos, no requieren API |
+| Matches (coincidencias) | Simulados (cruce local + dummy vinculado a figuritas reales) | No hay masa crítica de usuarios reales |
+| Kioscos | Simulados (3 direcciones reales, adhesión ficticia) | MVP académico |
+| Reputación | Simulada (intercambios dummy completados) | Sin transacciones reales |
 
-Facundo (frontend, navegación, pantallas)
+## Glosario
+- **Figurita:** cromo del álbum Panini del Mundial 2026.
+- **Match:** coincidencia entre dos usuarios para intercambiar figuritas.
+- **Kiosco adherido:** comercio asociado a FiguMatch que actúa como buzón de intercambio.
+- **Código de intercambio:** identificador único generado al aceptar un match.
+- **RLS:** Row Level Security, políticas de seguridad a nivel de fila en PostgreSQL.
+- **Bucket:** contenedor de archivos en Supabase Storage.
+- **Debounce:** retardo aplicado a una llamada para evitar ejecuciones múltiples.
 
+## Cómo ejecutar
+1. Clonar el repositorio.
+2. Instalar las dependencias de forma reproducible:
+   ```bash
+   npm ci
 
----
+Crear un proyecto en Supabase y ejecutar las migraciones SQL.
 
-## AGENT.MD (Actualizado)
+Configurar las variables de entorno en un archivo .env:
 
-```markdown
-# 🤖 FiguMatch – Agent Instructions (v3 con Auth y API)
+EXPO_PUBLIC_SUPABASE_URL=<url>
+EXPO_PUBLIC_SUPABASE_ANON_KEY=<key>
+EXPO_PUBLIC_API_FOOTBALL_KEY=<key>
 
-## 🧩 Proyecto
-**FiguMatch** es una app móvil para intercambiar figuritas del Mundial 2026 usando kioscos como buzones seguros.
-MVP con autenticación Supabase (email/pass, Google OAuth, recuperación), base de datos real y API externa de fútbol.
-
-## 👥 Equipo
-- **Tapia Lautaro** – Tech Lead, único revisor/mergeador de PRs. Frontend intermedio.
-- **Graciela** – Backend & lógica compleja: AuthContext, servicio Supabase, API Football, matches, triggers SQL.
-- **Facundo** – Frontend general: navegación, pantallas principales, perfil, README, demo.
-
-## 📚 Stack
-- **Lenguaje:** TypeScript (strict mode)
-- **Framework:** React Native con Expo (managed workflow, SDK 52+)
-- **Backend/BD:** Supabase (PostgreSQL + Auth + REST API)
-- **Navegación:** React Navigation v6
-  - `RootNavigator` → condicional según sesión
-  - `AuthStack` (Login, Register, ForgotPassword)
-  - `MainTabs` (Figuritas, Matches, Kioscos, Perfil)
-- **Estado:** React Context + useReducer
-  - `AuthContext`: session, user, loading, signIn, signUp, signInWithGoogle, signOut, resetPassword
-  - `FiguritasContext`: lista de figuritas, CRUD, sincronización con Supabase
-- **Persistencia:** AsyncStorage (usado internamente por el cliente Supabase para sesión)
-- **Mapas:** react-native-maps (3 marcadores fijos desde tabla `kioscos`)
-- **API externa:** api-football.com
-- **Estilos:** StyleSheet nativo, tema centralizado en `constants/theme.ts`
-
-## 🗂️ Estructura del proyecto
-/src
-/components → Button, Input (con variantes), CardFigurita, CardMatch, StatusScreen
-/screens → LoginScreen, RegisterScreen, ForgotPasswordScreen, HomeScreen, AddFiguritaScreen,
-MatchesScreen, MatchDetailScreen, CodeScreen, MapScreen, ProfileScreen, OnboardingScreen
-/navigation → AuthStack, MainTabs, RootNavigator
-/context → AuthContext.tsx, FiguritasContext.tsx
-/services → api.ts (cliente axios/fetch para api-football), supabase.ts (cliente Supabase),
-matches.ts (cruce de figuritas + datos dummy)
-/constants → theme.ts, playerMapping.ts, dummyMatches.ts, kioscosData.ts
-/utils → validateEmail.ts, validatePassword.ts, generateCode.ts
-App.tsx → Providers (AuthProvider), RootNavigator
-
-## 🔐 Autenticación (reglas)
-- **Siempre** usar los métodos del `AuthContext`. No llamar a `supabase.auth` directamente desde componentes.
-- **Login email/contraseña:** validar campos no vacíos. Manejar error `Invalid login credentials` con mensaje "Email o contraseña incorrectos. Si no tenés cuenta, registrate." No revelar si el email existe.
-- **Registro:** validar nombre, email (regex), contraseña (≥6), repetir contraseña exacta. Si `User already registered`, mostrar "Ya existe una cuenta. ¿Iniciar sesión?" con botón que navegue a Login con email pre-rellenado.
-- **Google OAuth:** usar `signInWithOAuth({ provider: 'google' })`. El trigger `handle_new_user` en Supabase crea el perfil automáticamente. Si falla por cancelación del usuario, no mostrar error.
-- **Recuperación:** `resetPasswordForEmail`. Éxito: "Revisá tu correo." Error: "No pudimos enviar el enlace. Verificá el email."
-- **Persistencia:** el cliente Supabase con `persistSession: true` y `storage: AsyncStorage` mantiene la sesión. Al iniciar la app, `getSession()` restaura.
-- **Logout:** `signOut()` y redirigir a `Login`.
-
-## 🗃️ Supabase (reglas)
-- Usar el cliente exportado desde `services/supabase.ts`.
-- Las consultas a `figuritas` siempre filtradas por `user_id = auth.uid()` (RLS lo asegura, pero igual aplicarlas).
-- Tablas:
-  - `profiles`: leer `*`, actualizar solo `nombre` y `barrio` desde Perfil.
-  - `figuritas`: CRUD completo, siempre con `user_id`.
-  - `matches`: insertar al generar match; leer con filtro de participantes.
-  - `intercambios`: insertar al aceptar match; leer para historial.
-  - `kioscos`: solo lectura.
-- Al crear un match, verificar que no exista ya uno pendiente entre los mismos usuarios con las mismas figuritas.
-- Al aceptar un match, generar código único (UUID corto), asignar kiosco aleatorio (`kioscos` table) y cambiar estado del match a "aceptado".
-
-## 🌐 API Football (reglas)
-- **Endpoint:** `GET https://v3.football.api-sports.io/players?season=2026&league=1&search={nombre}`
-- **API Key:** `EXPO_PUBLIC_API_FOOTBALL_KEY`. No exponer en código ni commits.
-- **Flujo:**
-  1. Usuario ingresa número de figurita.
-  2. Se busca en `playerMapping.ts` un nombre asociado (ej: 47 → "Messi").
-  3. Si hay mapeo, se llama a la API con ese nombre.
-  4. Estados:
-     - **Carga:** mostrar `ActivityIndicator` pequeño junto al campo "Nombre del jugador".
-     - **Éxito:** autocompletar el campo con `response.response[0].player.name`.
-     - **Vacío:** si la API responde sin resultados, dejar el campo vacío y permitir guardar manualmente.
-     - **Error:** mostrar mensaje "No se pudo obtener el nombre. ¿Reintentar?" con botón.
-  5. Si la API falla, se permite guardar la figurita sin nombre.
-- **Rate limit:** si la API devuelve 429, mostrar mensaje amigable y esperar 1 minuto antes de reintentar.
-- **Offline:** si no hay conexión, guardar sin nombre y marcar para sincronización futura (no obligatorio en MVP).
-
-## 🧭 Navegación
-- `RootNavigator`: si `loading` → splash/spinner. Si `session` → `MainTabs`. Sino → `AuthStack`.
-- `AuthStack`: Login, Register, ForgotPassword. Sin header.
-- `MainTabs`: 4 tabs (Figuritas, Matches, Kioscos, Perfil). Íconos con SF Symbols o MaterialIcons.
-- Dentro de "Figuritas": Stack con Home y AddFigurita.
-- Dentro de "Matches": Stack con MatchesList, MatchDetail, Code.
-- Al mostrar Code o MatchDetail, ocultar la tab bar (`tabBarStyle: { display: 'none' }`).
-
-## ✅ Git workflow (recordatorio)
-- **Solo Tapia Lautaro aprueba y mergea PRs.**
-- Ramas: `main`, `develop`, `feature/*`, `fix/*`, `chore/*`, `docs/*`.
-- Commits convencionales.
-- No commitear `.env`, `node_modules`, `.expo`.
-
-## 🧪 Pruebas manuales esenciales
-1. **Auth:** registro → logout → login → recuperación → login con Google.
-2. **Camino feliz:** login → agregar 2 figuritas (con API) → buscar matches → aceptar → ver código → abrir mapa.
-3. **API Football:** agregar figurita con número mapeado → ver spinner → nombre autocompletado. Sin conexión → error controlado.
-4. **Estados vacíos:** sin figuritas → mensaje. Sin matches → mensaje con botón "Invitar amigos".
-5. **Estados de error:** desconectar internet → login (error de red), buscar matches (error).
-
-## 📄 Documentación
-- `README.md`: descripción, stack, ejecución, variables de entorno, capturas.
-- `spec.md`: alcance, BD, justificación API.
-- `GIT_WORKFLOW.md`: reglas de ramas y PRs.
-- `AGENT.md`: este archivo (instrucciones para IA).
+Iniciar el servidor de desarrollo:
+npx expo start
+Escanear el código QR con Expo Go en un dispositivo o emulador.

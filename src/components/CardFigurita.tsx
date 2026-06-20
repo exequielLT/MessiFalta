@@ -1,40 +1,29 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ViewStyle, StyleProp } from 'react-native';
-import { colors, borderRadius, spacing, fontSizes } from '../constants/theme';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { useTheme } from '@/hooks/use-theme';
 
 interface CardFiguritaProps {
-  number: number | string;
+  number: number;
   type: 'repetida' | 'faltante';
   playerName?: string;
   onPress?: () => void;
-  style?: StyleProp<ViewStyle>;
 }
 
-export const CardFigurita: React.FC<CardFiguritaProps> = ({
-  number,
-  type,
-  playerName,
-  onPress,
-  style,
-}) => {
+export const CardFigurita: React.FC<CardFiguritaProps> = ({ number, type, playerName, onPress }) => {
+  const theme = useTheme();
   const isRepetida = type === 'repetida';
-  const typeLabel = isRepetida ? 'Repetida' : 'Faltante';
-  const circleColor = isRepetida ? colors.secondary : colors.warning;
+  const circleColor = isRepetida ? theme.secondary : theme.tertiary;
+  const tagText = isRepetida ? 'Repetida' : 'Faltante';
 
   const content = (
-    <View style={[styles.container, style]}>
+    <View style={[styles.container, { backgroundColor: theme.surfaceContainerLowest, borderColor: theme.outlineVariant }]}>
       <View style={[styles.circle, { backgroundColor: circleColor }]}>
-        <Text style={styles.numberText}>{number}</Text>
+        <Text style={styles.number}>{number}</Text>
       </View>
+      
       <View style={styles.infoContainer}>
-        {playerName ? (
-          <Text style={styles.playerName} numberOfLines={1}>
-            {playerName}
-          </Text>
-        ) : (
-          <Text style={styles.playerName}>Figurita #{number}</Text>
-        )}
-        <Text style={styles.typeLabel}>{typeLabel}</Text>
+        {playerName && <Text style={[styles.playerName, { color: theme.onSurface }]}>{playerName}</Text>}
+        <Text style={[styles.tagText, { color: theme.onSurfaceVariant }]}>{tagText}</Text>
       </View>
     </View>
   );
@@ -55,10 +44,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 8,
   },
   circle: {
     width: 40,
@@ -66,11 +54,11 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.md,
+    marginRight: 12,
   },
-  numberText: {
+  number: {
     color: '#FFFFFF',
-    fontSize: fontSizes.body,
+    fontSize: 16,
     fontWeight: 'bold',
   },
   infoContainer: {
@@ -78,13 +66,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   playerName: {
-    color: colors.textPrimary,
-    fontSize: fontSizes.body,
-    fontWeight: '600',
-    marginBottom: 4,
+    fontSize: 16,
+    marginBottom: 2,
   },
-  typeLabel: {
-    color: colors.textSecondary,
-    fontSize: fontSizes.caption,
+  tagText: {
+    fontSize: 12,
   },
 });

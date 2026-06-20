@@ -1,297 +1,470 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
+  Image,
   KeyboardAvoidingView,
   Platform,
+  SafeAreaView,
   ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
-import { colors, spacing, borderRadius, fontSizes } from '../constants/theme';
-// @ts-ignore - Assuming useAuth is exported from AuthContext
-import { useAuth } from '../context/AuthContext';
-// @ts-ignore - Assuming addFigurita is exported from figuritasService
-import { addFigurita } from '../services/figuritasService';
-// @ts-ignore - Assuming searchPlayer is exported from api
+import { colors } from '../constants/theme';
+import { useTheme } from '../hooks/use-theme';
 import { searchPlayer } from '../services/api';
-// @ts-ignore - Assuming playerMapping is an object exported from playerMapping
-import { playerMapping } from '../constants/playerMapping';
+import { buildPlayerImageFileName, uploadPlayerImage } from '../services/storageService';
+import { figuritasService } from '../services/figuritasService';
+import { useAuth } from '@/context/AuthContext';
+import { Figurita } from '../types';
 
-export const AddFiguritaScreen = () => {
-  const navigation = useNavigation();
+interface AddFiguritaScreenProps {
+  onClose?: () => void;
+  figurita?: Figurita;
+}
+
+
+const formatNationality = (value?: string | null) => {
+  if (!value) return null;
+  return value.charAt(0).toUpperCase() + value.slice(1);
+};
+
+// Se genera un numero deterministico en base al nombre del jugador
+// Así evitamos tener que pedirle el número al usuario y mantenemos
+// la compatibilidad con el sistema de Matchmaking (que requiere un numero del 1 al 678)
+const generateNumberFromName = (name: string): number => {
+  let hash = 0;
+  const str = name.toLowerCase().trim();
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return (Math.abs(hash) % 678) + 1;
+};
+
+export const AddFiguritaScreen: React.FC<AddFiguritaScreenProps> = ({ onClose, figurita }) => {
+  const router = useRouter();
   const { user } = useAuth();
+  const theme = useTheme();
 
-  const [numero, setNumero] = useState('');
-  const [nombre, setNombre] = useState('');
-  const [tipo, setTipo] = useState<'repetida' | 'faltante' | null>(null);
-  
+  const [nombre, setNombre] = useState(figurita?.nombre_jugador || '');
+  const [tipo, setTipo] = useState<'repetida' | 'faltante' | null>(figurita?.tipo || null);
+  const [nacionalidad, setNacionalidad] = useState(figurita?.seleccion || '');
+  const [imageUrl, setImageUrl] = useState<string | null>(figurita?.imagen_url || null);
+
+
   const [saving, setSaving] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-  
   const [searching, setSearching] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const [apiError, setApiError] = useState('');
+  const [showCheck, setShowCheck] = useState(false);
 
-  const handleSearchPlayer = async (numToSearch: string) => {
-    const numInt = parseInt(numToSearch, 10);
-    if (isNaN(numInt) || numInt < 1 || numInt > 678) return;
+  const isFirstMount = useRef(true);
+  const searchIdRef = useRef(0);
 
-    const mappedName = playerMapping[numToSearch];
-    if (!mappedName) return;
+  useEffect(() => {
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      return;
+    }
+
+    const handler = setTimeout(() => {
+      if (nombre.trim().length >= 3) {
+        handleSearch(nombre.trim());
+      }
+    }, 800);
+
+    return () => clearTimeout(handler);
+  }, [nombre]);
+
+  const handleSearch = async (nameStr: string) => {
+    const currentSearchId = searchIdRef.current + 1;
+    searchIdRef.current = currentSearchId;
+
+    setApiError('');
+    setShowCheck(false);
 
     setSearching(true);
-    setApiError('');
     try {
-      const response = await searchPlayer(mappedName);
-      if (response && response.response && response.response.length > 0) {
-        setNombre(response.response[0].player.name);
-      } else {
-        setApiError('Jugador no encontrado');
+      const { data, error } = await searchPlayer(nameStr);
+      if (searchIdRef.current !== currentSearchId) return;
+
+      if (error === 'RATE_LIMIT') {
+        setApiError('Demasiadas búsquedas. Esperá un minuto.');
+        return;
       }
-    } catch (error) {
-      setApiError('No se pudo obtener el nombre. ¿Reintentar?');
+
+      if (error === 'NOT_FOUND') {
+        setApiError('Jugador no encontrado. Podés guardarlo igual.');
+        return;
+      }
+
+      if (error === 'NETWORK_ERROR' || error === 'SERVER_ERROR') {
+        setApiError('No se pudo buscar en la API. ¿Reintentar?');
+        return;
+      }
+
+      if (data) {
+        if (data.nationality) {
+          setNacionalidad(formatNationality(data.nationality) || '');
+        }
+
+        if (data.photo) {
+          if (searchIdRef.current === currentSearchId) {
+            setImageUrl(data.photo);
+          }
+        }
+
+        setShowCheck(true);
+        setTimeout(() => setShowCheck(false), 2000);
+      }
+    } catch (err) {
+      if (searchIdRef.current === currentSearchId) {
+        console.error(err);
+        setApiError('No se pudo buscar en la API. ¿Reintentar?');
+      }
     } finally {
-      setSearching(false);
+      if (searchIdRef.current === currentSearchId) {
+        setSearching(false);
+      }
     }
   };
 
-  useEffect(() => {
-    if (!numero) return;
-
-    const timer = setTimeout(() => {
-      handleSearchPlayer(numero);
-    }, 800);
-
-    return () => clearTimeout(timer);
-  }, [numero]);
+  const handleNameChange = (text: string) => {
+    setNombre(text);
+    searchIdRef.current += 1;
+    setApiError('');
+    setErrorMessage('');
+    setSearching(false);
+    setShowCheck(false);
+  };
 
   const handleSave = async () => {
-    if (!numero || !tipo) return;
+    setErrorMessage('');
 
-    const numInt = parseInt(numero, 10);
-    if (isNaN(numInt) || numInt < 1 || numInt > 678) {
-      setErrorMessage('El número debe estar entre 1 y 678');
+    if (!nombre.trim()) {
+      setErrorMessage('Ingresá el nombre del jugador');
       return;
     }
 
-    if (!user || !user.id) {
-      setErrorMessage('Debes iniciar sesión para guardar');
+    if (!nacionalidad.trim()) {
+      setErrorMessage('Ingresá la nacionalidad');
       return;
     }
+
+    if (!tipo) {
+      setErrorMessage('Seleccioná el tipo de figurita');
+      return;
+    }
+
+    if (!user?.id) {
+      setErrorMessage('Error de sesión. Volvé a ingresar.');
+      return;
+    }
+
+    const generatedNum = generateNumberFromName(nombre);
 
     setSaving(true);
-    setErrorMessage('');
     try {
-      await addFigurita(user.id, {
-        numero: numInt,
-        tipo,
-        nombre_jugador: nombre,
-      });
-      navigation.goBack();
-    } catch (error) {
-      setErrorMessage('Error al guardar la figurita');
+      let finalImageUrl = imageUrl;
+      
+      // If we have an external image URL from the API, download and upload it to Supabase Storage only now!
+      if (imageUrl && imageUrl.startsWith('http') && !imageUrl.includes('supabase.co')) {
+        try {
+          const fileName = buildPlayerImageFileName(generatedNum, nombre.trim());
+          finalImageUrl = await uploadPlayerImage(imageUrl, fileName);
+        } catch (uploadErr) {
+          console.error('Failed to upload player image to Supabase on save:', uploadErr);
+          // If upload fails, fallback to the external URL so the card still has an image
+        }
+      }
+
+      if (figurita) {
+        await figuritasService.updateFigurita(figurita.id, {
+          numero: generatedNum,
+          tipo,
+          nombreJugador: nombre.trim(),
+          imagenUrl: finalImageUrl,
+          seleccion: nacionalidad.trim(),
+        });
+      } else {
+        await figuritasService.createFigurita({
+          userId: user.id,
+          numero: generatedNum,
+          tipo,
+          nombreJugador: nombre.trim(),
+          imagenUrl: finalImageUrl,
+          seleccion: nacionalidad.trim(),
+        });
+      }
+
+      if (onClose) {
+        onClose();
+      } else {
+        router.back();
+      }
+    } catch (err) {
+      console.error(err);
+      setErrorMessage('Error al guardar la figurita. Reintentá.');
     } finally {
       setSaving(false);
     }
   };
 
+  const canPreview = nombre.trim().length > 0;
+  const isSaveDisabled = !nombre.trim() || !nacionalidad.trim() || !tipo || searching;
+  const selectedTypeLabel = tipo === 'repetida' ? 'Repetida' : tipo === 'faltante' ? 'Faltante' : 'Sin elegir';
+
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>{'< Volver'}</Text>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+      <View style={[styles.header, { borderBottomColor: theme.outlineVariant }]}>
+        <TouchableOpacity onPress={() => (onClose ? onClose() : router.back())} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color={theme.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Agregar figurita</Text>
-        <View style={{ width: 60 }} />
+        <Text style={[styles.headerTitle, { color: theme.text }]}>
+          {figurita ? 'Editar figurita' : 'Agregar figurita'}
+        </Text>
+        <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Input
-          label="Número de la figurita"
-          placeholder="Ej: 10"
-          value={numero}
-          onChangeText={(val) => {
-            setNumero(val.replace(/[^0-9]/g, ''));
-            setApiError('');
-          }}
-          keyboardType="numeric"
-          maxLength={3}
-        />
+      <KeyboardAvoidingView
+        style={[styles.container, { backgroundColor: theme.background }]}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+          <View style={styles.nameInputContainer}>
+            <Input
+              label="Nombre del jugador"
+              placeholder="Ej: Lionel Messi"
+              value={nombre}
+              onChangeText={handleNameChange}
+              loading={searching}
+              rightIcon={showCheck ? <Ionicons name="checkmark-circle" size={20} color={theme.secondary} /> : undefined}
+              labelStyle={{ color: theme.textSecondary }}
+              inputContainerStyle={{ backgroundColor: theme.surfaceContainer, borderColor: theme.outlineVariant }}
+              inputStyle={{ color: theme.text }}
+              placeholderTextColor={theme.textSecondary}
+            />
+            {apiError ? (
+              <View style={styles.apiErrorContainer}>
+                <Text style={[styles.apiErrorText, { color: theme.error }]}>{apiError}</Text>
+                {apiError.includes('¿Reintentar?') && (
+                  <TouchableOpacity onPress={() => handleSearch(nombre)} disabled={searching}>
+                    <Text style={[styles.retryText, { color: theme.primary }]}>Reintentar</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ) : null}
+          </View>
 
-        <View style={styles.nombreContainer}>
           <Input
-            label="Nombre del jugador (opcional)"
-            placeholder="Ej: Lionel Messi"
-            value={nombre}
-            onChangeText={setNombre}
-            loading={searching}
+            label="Nacionalidad"
+            placeholder="Ej: Argentina"
+            value={nacionalidad}
+            onChangeText={setNacionalidad}
+            labelStyle={{ color: theme.textSecondary }}
+            inputContainerStyle={{ backgroundColor: theme.surfaceContainer, borderColor: theme.outlineVariant, marginBottom: 16 }}
+            inputStyle={{ color: theme.text }}
+            placeholderTextColor={theme.textSecondary}
           />
-          {apiError ? (
-            <View style={styles.apiErrorContainer}>
-              <Text style={styles.apiErrorText}>{apiError}</Text>
-              <TouchableOpacity onPress={() => handleSearchPlayer(numero)}>
-                <Text style={styles.retryText}>Reintentar</Text>
-              </TouchableOpacity>
+
+          <Text style={[styles.typeLabel, { color: theme.textSecondary }]}>Tipo de figurita</Text>
+          <View style={styles.typeContainer}>
+            <TouchableOpacity
+              style={[
+                styles.typeButton,
+                { backgroundColor: theme.surfaceContainer, borderColor: theme.outlineVariant },
+                tipo === 'repetida' && { backgroundColor: theme.secondary, borderColor: theme.secondary },
+              ]}
+              onPress={() => setTipo('repetida')}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.typeButtonText, { color: tipo === 'repetida' ? theme.onSecondary : theme.text }]}>
+                La tengo repetida
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.typeButton,
+                { backgroundColor: theme.surfaceContainer, borderColor: theme.outlineVariant },
+                tipo === 'faltante' && { backgroundColor: theme.tertiary, borderColor: theme.tertiary },
+              ]}
+              onPress={() => setTipo('faltante')}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.typeButtonText, { color: tipo === 'faltante' ? theme.onTertiary : theme.text }]}>
+                La necesito
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {canPreview ? (
+            <View style={[styles.previewCard, { backgroundColor: theme.surfaceContainerLowest, borderColor: theme.outlineVariant }]}>
+              <Text style={[styles.previewTitle, { color: theme.text }]}>Revisá antes de guardar</Text>
+              <View style={styles.previewContent}>
+                <View style={[styles.previewImage, { backgroundColor: theme.surfaceContainerHigh }]}>
+                  {imageUrl ? (
+                    <Image source={{ uri: imageUrl }} style={styles.playerImage} resizeMode="cover" />
+                  ) : (
+                    <Ionicons name="person" size={34} color={theme.onSurfaceVariant} />
+                  )}
+                </View>
+                <View style={styles.previewInfo}>
+                  <Text style={[styles.previewName, { color: theme.text }]}>{nombre.trim()}</Text>
+                  <Text style={[styles.previewMeta, { color: theme.textSecondary }]}>Nacionalidad: {nacionalidad || 'Sin dato'}</Text>
+                  <Text style={[styles.previewMeta, { color: theme.textSecondary }]}>Tipo: {selectedTypeLabel}</Text>
+                </View>
+              </View>
             </View>
           ) : null}
-        </View>
 
-        <Text style={styles.label}>¿Qué tipo de figurita es?</Text>
-        <View style={styles.segmentedControl}>
-          <TouchableOpacity
-            style={[
-              styles.segmentButton,
-              tipo === 'repetida' && styles.segmentButtonRepetida,
-            ]}
-            onPress={() => setTipo('repetida')}
-            activeOpacity={0.7}
-          >
-            <Text
-              style={[
-                styles.segmentButtonText,
-                tipo === 'repetida' && styles.segmentButtonTextActive,
-              ]}
-            >
-              La tengo repetida
-            </Text>
-          </TouchableOpacity>
+          {errorMessage ? <Text style={[styles.mainErrorText, { color: theme.error }]}>{errorMessage}</Text> : null}
 
-          <TouchableOpacity
-            style={[
-              styles.segmentButton,
-              tipo === 'faltante' && styles.segmentButtonFaltante,
-            ]}
-            onPress={() => setTipo('faltante')}
-            activeOpacity={0.7}
-          >
-            <Text
-              style={[
-                styles.segmentButtonText,
-                tipo === 'faltante' && styles.segmentButtonTextActive,
-              ]}
-            >
-              La necesito
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
-
-        <View style={styles.buttonContainer}>
-          <Button
-            title="Guardar figurita"
-            onPress={handleSave}
-            disabled={!numero || !tipo}
-            loading={saving}
-          />
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+          <View style={styles.footer}>
+            <Button
+              title="Guardar figurita"
+              onPress={handleSave}
+              variant="primary"
+              disabled={isSaveDisabled}
+              loading={saving}
+              style={{ backgroundColor: theme.primaryContainer }}
+            />
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
-export default AddFiguritaScreen;
-
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.background || '#FFFFFF',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingTop: Platform.OS === 'ios' ? 50 : 20,
-    paddingBottom: spacing.md,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
-    backgroundColor: colors.background,
   },
   backButton: {
-    width: 60,
-  },
-  backButtonText: {
-    color: colors.primary,
-    fontSize: fontSizes.body,
-    fontWeight: '500',
+    padding: 4,
   },
   headerTitle: {
-    fontSize: fontSizes.h2,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '600',
     color: colors.textPrimary,
   },
-  scrollContent: {
-    padding: spacing.lg,
+  container: {
+    flex: 1,
   },
-  nombreContainer: {
-    marginBottom: spacing.xs,
+  scrollContent: {
+    padding: 24,
+  },
+  nameInputContainer: {
+    marginBottom: 8,
   },
   apiErrorContainer: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.md,
-    paddingHorizontal: spacing.xs,
+    marginTop: -8,
+    marginBottom: 16,
   },
   apiErrorText: {
+    fontSize: 12,
     color: colors.error,
-    fontSize: fontSizes.caption,
+    flex: 1,
   },
   retryText: {
+    fontSize: 12,
     color: colors.primary,
-    fontSize: fontSizes.caption,
-    fontWeight: 'bold',
+    fontWeight: '600',
+    marginLeft: 8,
   },
-  label: {
+  typeLabel: {
     fontSize: 14,
     color: colors.textSecondary,
-    marginBottom: spacing.sm,
-    fontWeight: '500',
+    marginBottom: 8,
   },
-  segmentedControl: {
+  typeContainer: {
     flexDirection: 'row',
-    marginBottom: spacing.lg,
-    gap: spacing.md,
+    justifyContent: 'space-between',
+    marginBottom: 24,
   },
-  segmentButton: {
+  typeButton: {
     flex: 1,
-    height: 48,
-    borderRadius: borderRadius.sm,
+    minHeight: 48,
     borderWidth: 1,
     borderColor: colors.border,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.surface,
+    marginHorizontal: 4,
+    paddingHorizontal: 10,
+    backgroundColor: '#FFFFFF',
   },
-  segmentButtonRepetida: {
-    backgroundColor: colors.secondary,
-    borderColor: colors.secondary,
-  },
-  segmentButtonFaltante: {
-    backgroundColor: colors.warning,
-    borderColor: colors.warning,
-  },
-  segmentButtonText: {
-    color: colors.textPrimary,
+  typeButtonText: {
+    fontSize: 14,
     fontWeight: '600',
-    fontSize: 14,
-  },
-  segmentButtonTextActive: {
-    color: '#FFFFFF',
-  },
-  errorText: {
-    color: colors.error,
-    fontSize: 14,
+    color: colors.textPrimary,
     textAlign: 'center',
-    marginBottom: spacing.md,
   },
-  buttonContainer: {
-    marginTop: spacing.sm,
+  previewCard: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+  },
+  previewTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 12,
+  },
+  previewContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  previewImage: {
+    width: 76,
+    height: 76,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+    marginRight: 14,
+  },
+  playerImage: {
+    width: '100%',
+    height: '100%',
+  },
+  previewInfo: {
+    flex: 1,
+    gap: 3,
+  },
+  previewName: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  previewMeta: {
+    fontSize: 13,
+  },
+  mainErrorText: {
+    fontSize: 14,
+    color: colors.error,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  footer: {
+    marginTop: 16,
   },
 });

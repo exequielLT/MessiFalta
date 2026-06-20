@@ -1,22 +1,23 @@
-import React, { ReactNode } from 'react';
-import {
-  View,
-  TextInput,
-  Text,
-  ActivityIndicator,
-  StyleSheet,
-  StyleProp,
-  ViewStyle,
-  TextInputProps,
-} from 'react-native';
-import { colors, borderRadius, spacing, fontSizes } from '../constants/theme';
+import React, { useState } from 'react';
+import { View, TextInput, Text, StyleSheet, ViewStyle, TextStyle, KeyboardTypeOptions, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { colors } from '../constants/theme';
+import { Ionicons } from '@expo/vector-icons';
 
-interface InputProps extends TextInputProps {
+interface InputProps {
   label?: string;
+  value: string;
+  onChangeText: (text: string) => void;
+  placeholder?: string;
   errorMessage?: string;
+  secureTextEntry?: boolean;
+  keyboardType?: KeyboardTypeOptions;
   loading?: boolean;
-  rightIcon?: ReactNode;
-  containerStyle?: StyleProp<ViewStyle>;
+  rightIcon?: React.ReactNode;
+  style?: ViewStyle;
+  labelStyle?: TextStyle;
+  inputContainerStyle?: ViewStyle;
+  inputStyle?: TextStyle;
+  placeholderTextColor?: string;
 }
 
 export const Input: React.FC<InputProps> = ({
@@ -25,65 +26,61 @@ export const Input: React.FC<InputProps> = ({
   onChangeText,
   placeholder,
   errorMessage,
-  secureTextEntry,
-  keyboardType,
+  secureTextEntry = false,
+  keyboardType = 'default',
   loading = false,
   rightIcon,
   style,
-  containerStyle,
-  ...rest
+  labelStyle,
+  inputContainerStyle,
+  inputStyle,
+  placeholderTextColor = colors.textSecondary,
 }) => {
-  const hasError = !!errorMessage;
+  const [isSecure, setIsSecure] = useState(secureTextEntry);
 
   return (
-    <View style={[styles.container, containerStyle]}>
-      {label && <Text style={styles.label}>{label}</Text>}
+    <View style={[styles.container, style]}>
+      {label && <Text style={[styles.label, labelStyle]}>{label}</Text>}
       
-      <View
-        style={[
-          styles.inputContainer,
-          hasError && styles.inputContainerError,
-          style,
-        ]}
-      >
+      <View style={[styles.inputContainer, errorMessage ? styles.inputError : null, inputContainerStyle]}>
         <TextInput
-          style={styles.input}
+          style={[styles.input, inputStyle]}
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
-          placeholderTextColor={colors.textSecondary}
-          secureTextEntry={secureTextEntry}
+          placeholderTextColor={placeholderTextColor}
+          secureTextEntry={isSecure}
           keyboardType={keyboardType}
-          {...rest}
         />
         
-        {loading && (
-          <ActivityIndicator
-            size="small"
-            color={colors.primary}
-            style={styles.rightElement}
-          />
-        )}
+        {loading && <ActivityIndicator color={colors.primary} style={styles.rightElement} size="small" />}
         
-        {!loading && rightIcon && (
-          <View style={styles.rightElement}>{rightIcon}</View>
+        {!loading && secureTextEntry && (
+          <TouchableOpacity onPress={() => setIsSecure(!isSecure)} style={styles.rightElement}>
+            <Ionicons name={isSecure ? 'eye-off' : 'eye'} size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
+        )}
+
+        {!loading && !secureTextEntry && rightIcon && (
+          <View style={styles.rightElement}>
+            {rightIcon}
+          </View>
         )}
       </View>
       
-      {hasError && <Text style={styles.errorText}>{errorMessage}</Text>}
+      {errorMessage && <Text style={styles.errorText}>{errorMessage}</Text>}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: spacing.md,
+    marginBottom: 16,
   },
   label: {
-    fontSize: 14,
     color: colors.textSecondary,
-    marginBottom: spacing.xs,
-    fontWeight: '500',
+    fontSize: 14,
+    marginBottom: 4,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -91,27 +88,25 @@ const styles = StyleSheet.create({
     height: 48,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: borderRadius.sm,
-    paddingHorizontal: spacing.md,
-    backgroundColor: colors.background,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
   },
-  inputContainerError: {
+  inputError: {
     borderColor: colors.error,
   },
   input: {
     flex: 1,
     height: '100%',
     color: colors.textPrimary,
-    fontSize: fontSizes.body,
+    fontSize: 16,
   },
   rightElement: {
-    marginLeft: spacing.sm,
-    justifyContent: 'center',
-    alignItems: 'center',
+    marginLeft: 8,
   },
   errorText: {
     color: colors.error,
-    fontSize: fontSizes.caption,
-    marginTop: spacing.xs,
+    fontSize: 12,
+    marginTop: 4,
   },
 });

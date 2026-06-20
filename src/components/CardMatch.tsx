@@ -1,20 +1,23 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ViewStyle, StyleProp } from 'react-native';
-import { colors, borderRadius, spacing, fontSizes } from '../constants/theme';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { useTheme } from '@/hooks/use-theme';
+import { Ionicons } from '@expo/vector-icons';
 
-export interface FiguritaInfo {
-  number: number | string;
+interface FiguritaInfo {
+  number: number;
   name?: string;
 }
 
-export interface CardMatchProps {
+interface CardMatchProps {
   userName: string;
   reputation: number;
   offeredFigurita: FiguritaInfo;
   requestedFigurita: FiguritaInfo;
   distance?: string;
   onPress?: () => void;
-  style?: StyleProp<ViewStyle>;
+  avatarUrl?: string;
+  tradesCount?: number;
+  style?: any;
 }
 
 export const CardMatch: React.FC<CardMatchProps> = ({
@@ -24,62 +27,61 @@ export const CardMatch: React.FC<CardMatchProps> = ({
   requestedFigurita,
   distance,
   onPress,
+  avatarUrl,
+  tradesCount,
   style,
 }) => {
+  const theme = useTheme();
+
   const renderStars = () => {
     const stars = [];
-    const maxStars = 5;
-    for (let i = 0; i < maxStars; i++) {
+    for (let i = 1; i <= 5; i++) {
       stars.push(
-        <Text
-          key={i}
-          style={[
-            styles.star,
-            { color: i < reputation ? colors.warning : colors.border },
-          ]}
-        >
-          ★
+        <Text key={i} style={{ color: i <= reputation ? '#FF9500' : theme.outlineVariant, fontSize: 14 }}>
+          {i <= reputation ? '★' : '☆'}
         </Text>
       );
     }
     return <View style={styles.starsContainer}>{stars}</View>;
   };
 
-  const renderFiguritaInfo = (label: string, figurita: FiguritaInfo, tagColor: string) => {
-    const text = figurita.name
-      ? `Nº ${figurita.number} - ${figurita.name}`
-      : `Nº ${figurita.number}`;
-      
-    return (
-      <View style={styles.figuritaRow}>
-        <View style={[styles.tag, { backgroundColor: tagColor }]}>
-          <Text style={styles.tagText}>{label}</Text>
-        </View>
-        <Text style={styles.figuritaText} numberOfLines={1}>
-          {text}
-        </Text>
-      </View>
-    );
-  };
-
   const content = (
-    <View style={[styles.container, style]}>
-      <View style={styles.headerRow}>
-        <Text style={styles.userName} numberOfLines={1}>
-          {userName}
-        </Text>
-        {renderStars()}
+    <View style={[styles.container, { backgroundColor: theme.surfaceContainerLowest, borderColor: theme.outlineVariant }, style]}>
+      <View style={styles.contentContainer}>
+        <View style={styles.headerRow}>
+          <Text style={[styles.userName, { color: theme.onSurface }]}>{userName}</Text>
+          {renderStars()}
+        </View>
+
+        <View style={tradeRowStyle(styles.tradeRow)}>
+          <Text style={[styles.tradeLabel, { color: theme.onSurface }]}>Ofrece: </Text>
+          <View style={[styles.tag, { backgroundColor: theme.secondary + '20' }]}>
+            <Text style={[styles.tagText, { color: theme.secondary }]}>
+              Nº {offeredFigurita.number}{offeredFigurita.name ? ` - ${offeredFigurita.name}` : ''}
+            </Text>
+          </View>
+        </View>
+
+        <View style={tradeRowStyle(styles.tradeRow)}>
+          <Text style={[styles.tradeLabel, { color: theme.onSurface }]}>Busca: </Text>
+          <View style={[styles.tag, { backgroundColor: theme.tertiary + '20' }]}>
+            <Text style={[styles.tagText, { color: theme.tertiary }]}>
+              Nº {requestedFigurita.number}{requestedFigurita.name ? ` - ${requestedFigurita.name}` : ''}
+            </Text>
+          </View>
+        </View>
+
+        {distance && (
+          <View style={styles.distanceRow}>
+            <Ionicons name="location-outline" size={14} color={theme.onSurfaceVariant} />
+            <Text style={[styles.distanceText, { color: theme.onSurfaceVariant }]}>{distance}</Text>
+          </View>
+        )}
       </View>
 
-      <View style={styles.detailsContainer}>
-        {renderFiguritaInfo('Ofrece', offeredFigurita, colors.secondary)}
-        {renderFiguritaInfo('Busca', requestedFigurita, colors.warning)}
-      </View>
-
-      {distance && (
-        <View style={styles.distanceContainer}>
-          <Text style={styles.distanceIcon}>📍</Text>
-          <Text style={styles.distanceText}>{distance}</Text>
+      {onPress && (
+        <View style={styles.chevronContainer}>
+          <Ionicons name="chevron-forward" size={24} color={theme.outlineVariant} />
         </View>
       )}
     </View>
@@ -96,72 +98,64 @@ export const CardMatch: React.FC<CardMatchProps> = ({
   return content;
 };
 
+// Helper helper for tradeRow styling types
+const tradeRowStyle = (style: any): any => style;
+
 const styles = StyleSheet.create({
   container: {
+    flexDirection: 'row',
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 8,
+  },
+  contentContainer: {
+    flex: 1,
   },
   headerRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    marginBottom: 12,
   },
   userName: {
-    fontSize: fontSizes.body,
+    fontSize: 16,
     fontWeight: '600',
-    color: colors.textPrimary,
-    flex: 1,
-    marginRight: spacing.sm,
+    marginRight: 8,
   },
   starsContainer: {
     flexDirection: 'row',
   },
-  star: {
-    fontSize: 16,
-    marginLeft: 2,
-  },
-  detailsContainer: {
-    gap: spacing.sm,
-  },
-  figuritaRow: {
+  tradeRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 8,
+    flexWrap: 'wrap',
   },
-  tag: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.sm,
-    marginRight: spacing.sm,
-    minWidth: 65,
-    alignItems: 'center',
-  },
-  tagText: {
-    color: '#FFFFFF',
-    fontSize: fontSizes.caption,
-    fontWeight: 'bold',
-  },
-  figuritaText: {
-    fontSize: fontSizes.body,
-    color: colors.textPrimary,
-    flex: 1,
-  },
-  distanceContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    marginTop: spacing.md,
-  },
-  distanceIcon: {
+  tradeLabel: {
     fontSize: 14,
     marginRight: 4,
   },
+  tag: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  tagText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  distanceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
   distanceText: {
-    fontSize: fontSizes.caption,
-    color: colors.textSecondary,
-    fontWeight: '500',
+    fontSize: 14,
+    marginLeft: 4,
+  },
+  chevronContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
   },
 });
