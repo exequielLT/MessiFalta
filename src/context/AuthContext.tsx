@@ -41,7 +41,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const params = new URLSearchParams(hash.substring(1));
             const access_token = params.get('access_token');
             const refresh_token = params.get('refresh_token');
+            const type = params.get('type');
             if (access_token && refresh_token) {
+              if (type === 'recovery') {
+                setIsPasswordRecovery(true);
+              }
               const { error } = await supabase.auth.setSession({ access_token, refresh_token });
               if (error) {
                 alert('Error al establecer sesión: ' + error.message);
@@ -97,7 +101,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         },
       },
     });
-    if (error) throw error;
+    if (error) {
+      if (error.message?.toLowerCase().includes('rate limit')) {
+        throw new Error('Límite de envíos excedido. Por favor, intentá de nuevo más tarde.');
+      }
+      throw error;
+    }
     return data;
   };
 
@@ -180,7 +189,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: redirectUrl,
     });
-    if (error) throw error;
+    if (error) {
+      if (error.message?.toLowerCase().includes('rate limit')) {
+        throw new Error('Límite de envíos excedido. Por favor, intentá de nuevo más tarde.');
+      }
+      throw error;
+    }
   };
 
   const updatePassword = async (password: string) => {
