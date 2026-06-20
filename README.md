@@ -9,6 +9,14 @@ FiguMatch es una aplicación móvil desarrollada para la asignatura **Diseño de
 
 ---
 
+## 🔗 Enlaces de interés
+
+*   **Prototipo de la app:** [https://figumatch-prototipo.lovable.app/](https://figumatch-prototipo.lovable.app/)
+*   **Wireframe de baja fidelidad:** [https://wages-mark-35166794.figma.site/](https://wages-mark-35166794.figma.site/)
+*   **Diseño:** [https://stitch.withgoogle.com/projects/14060704937802057372](https://stitch.withgoogle.com/projects/14060704937802057372)
+
+---
+
 ## 📌 Descripción del problema
 
 El coleccionismo de figuritas para el Mundial 2026 se enfrenta a desafíos logísticos y de seguridad. Actualmente, los coleccionistas dependen de grupos informales en redes sociales (Facebook, WhatsApp) o plataformas de comercio electrónico para coordinar encuentros cara a cara con extraños. Esto genera:
